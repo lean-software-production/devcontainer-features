@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Starts the Fabro server on every container start.
+#
+# postCreateCommand only fires when the container is created, so without this
+# the server is dead after any stop/start of a Codespace or dev container.
+# Deliberately silent: this runs in a lifecycle hook, not a terminal.
+set -uo pipefail
+
+[ -r /usr/local/share/fabro/setup.env ] && . /usr/local/share/fabro/setup.env
+[ "${FABRO_SETUP_AUTOSTART:-true}" = "true" ] || exit 0
+
+# No settings means setup has not run yet; fabro-setup will start it.
+[ -f "${HOME}/.fabro/settings.toml" ] || exit 0
+
+. /usr/local/share/fabro/bin/fabro-common.sh
+fabro_start_server
+exit 0

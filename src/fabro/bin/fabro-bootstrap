@@ -9,6 +9,7 @@
 set -uo pipefail
 
 [ -r /usr/local/share/fabro/setup.env ] && . /usr/local/share/fabro/setup.env
+. /usr/local/share/fabro/bin/fabro-common.sh
 AUTOSTART="${FABRO_SETUP_AUTOSTART:-true}"
 
 dim=$'\033[2m'; bold=$'\033[1m'; cyan=$'\033[1;36m'; reset=$'\033[0m'
@@ -45,7 +46,7 @@ fi
 if [ "${AUTOSTART}" = "true" ] && [ -f "${HOME}/.fabro/settings.toml" ]; then
     if fabro server status >/dev/null 2>&1; then
         note "${dim}Fabro server already running${reset}"
-    elif fabro server start >/dev/null 2>&1; then
+    elif fabro_start_server; then
         note "Started the local Fabro server"
     else
         note "${dim}Fabro server did not start; fabro-setup will report why.${reset}"

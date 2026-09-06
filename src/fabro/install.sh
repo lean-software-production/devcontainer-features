@@ -67,6 +67,8 @@ install -d -m 0755 "${SHARE_DIR}/bin"
 install -m 0755 "${FEATURE_DIR}/bin/fabro-bootstrap" "${SHARE_DIR}/bin/fabro-bootstrap"
 install -m 0755 "${FEATURE_DIR}/bin/fabro-setup" "${SHARE_DIR}/bin/fabro-setup"
 install -m 0755 "${FEATURE_DIR}/bin/fabro-status" "${SHARE_DIR}/bin/fabro-status"
+install -m 0755 "${FEATURE_DIR}/bin/fabro-autostart" "${SHARE_DIR}/bin/fabro-autostart"
+install -m 0644 "${FEATURE_DIR}/bin/fabro-common.sh" "${SHARE_DIR}/bin/fabro-common.sh"
 ln -sf "${SHARE_DIR}/bin/fabro-setup" /usr/local/bin/fabro-setup
 ln -sf "${SHARE_DIR}/bin/fabro-status" /usr/local/bin/fabro-status
 

@@ -6,11 +6,37 @@ The feature splits setup into the part that needs no human and the part that doe
 | --- | --- | --- |
 | `install.sh` | image build, as root | Downloads and checksum-verifies the Fabro binary, installs `fabro-setup` and `fabro-status`, records the resolved options |
 | `fabro-bootstrap` | `postCreateCommand`, as the remote user | Generates `~/.fabro/settings.toml` and starts the local Fabro server |
+| `fabro-autostart` | `postStartCommand`, as the remote user | Restarts the Fabro server on every container start |
 | `fabro-setup` | a terminal, on demand | Asks which provider to use and runs the sign-in |
 
 The split exists because dev container lifecycle hooks do not get a reliable
 interactive terminal ([devcontainers/spec#83](https://github.com/devcontainers/spec/issues/83)),
 so a hook cannot prompt. `fabro-setup` is a normal command you can run any time.
+
+`postStartCommand` matters as much as `postCreateCommand` here: a stopped and
+restarted Codespace keeps its filesystem but loses its processes, so without
+the start hook the server would be down until someone ran the wizard again.
+
+## Reaching the web UI
+
+The server listens on loopback. In a Codespace the browser reaches it through
+the forwarded host instead, so the feature sets `FABRO_WEB_URL` to
+`https://$CODESPACE_NAME-<port>.app.github.dev` when it starts the server, and
+leaves it as `http://127.0.0.1:<port>` everywhere else. Fabro uses that value
+for browser auth routes and generated links.
+
+Declare the port in your `devcontainer.json` so it is forwarded with a label
+rather than relying on auto-detection:
+
+```jsonc
+"forwardPorts": [32276],
+"portsAttributes": { "32276": { "label": "Fabro", "onAutoForward": "silent" } }
+```
+
+Forwarded ports are private by default, which means the browser completes a
+GitHub sign-in handshake before reaching the app. If that handshake stalls,
+open the port from the editor's PORTS panel rather than pasting the URL, and
+check you are signed in to the same GitHub account in that browser profile.
 
 ## Signing in from a Codespace
 

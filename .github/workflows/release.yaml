@@ -1,0 +1,29 @@
+name: "Release features"
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to ghcr.io (uncheck for a dry run)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish features to ghcr.io
+        uses: devcontainers/action@v1
+        with:
+          publish-features: "true"
+          base-path-to-features: "./src"
+          generate-docs: "true"
+          oci-registration: "true"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

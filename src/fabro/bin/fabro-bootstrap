@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Non-interactive Fabro setup, run as the remote user during postCreate.
+#
+# Lifecycle hooks have no TTY, so this does only the work that needs no input:
+# generate ~/.fabro/settings.toml and start the local server. Anything that
+# requires a human -- choosing a provider, signing in -- is left to fabro-setup.
+#
+# This must never fail container creation. Every step degrades to a message.
+set -uo pipefail
+
+[ -r /usr/local/share/fabro/setup.env ] && . /usr/local/share/fabro/setup.env
+AUTOSTART="${FABRO_SETUP_AUTOSTART:-true}"
+
+dim=$'\033[2m'; bold=$'\033[1m'; cyan=$'\033[1;36m'; reset=$'\033[0m'
+note() { printf '%s\n' "  $*"; }
+
+printf '\n%sFabro%s %s\n' "${cyan}" "${reset}" "$(fabro --version 2>/dev/null || echo 'not found')"
+
+# --- settings.toml ----------------------------------------------------------
+# `fabro install` also generates the server session secret and dev token, so
+# there is no supported way to hand-write this file.
+if [ -f "${HOME}/.fabro/settings.toml" ]; then
+    note "${dim}Existing configuration found at ~/.fabro/settings.toml${reset}"
+else
+    # Non-interactive install requires a GitHub strategy, and the token
+    # strategy shells out to `gh auth token`. Codespaces provides both.
+    github_user="${GITHUB_USER:-}"
+    if [ -z "${github_user}" ] && command -v gh >/dev/null 2>&1; then
+        github_user="$(gh api user -q .login 2>/dev/null || true)"
+    fi
+
+    if [ -n "${github_user}" ] && gh auth token >/dev/null 2>&1; then
+        if fabro install --non-interactive --skip-llm \
+            --github-strategy token --github-username "${github_user}" >/dev/null 2>&1; then
+            note "Initialized ~/.fabro/settings.toml for ${bold}${github_user}${reset}"
+        else
+            note "${dim}Could not initialize Fabro automatically; fabro-setup will retry.${reset}"
+        fi
+    else
+        note "${dim}No GitHub credential available yet; fabro-setup will finish this step.${reset}"
+    fi
+fi
+
+# --- server -----------------------------------------------------------------
+if [ "${AUTOSTART}" = "true" ] && [ -f "${HOME}/.fabro/settings.toml" ]; then
+    if fabro server status >/dev/null 2>&1; then
+        note "${dim}Fabro server already running${reset}"
+    elif fabro server start >/dev/null 2>&1; then
+        note "Started the local Fabro server"
+    else
+        note "${dim}Fabro server did not start; fabro-setup will report why.${reset}"
+    fi
+fi
+
+# --- hand off ---------------------------------------------------------------
+if fabro-status --quiet; then
+    note "LLM provider configured. Fabro is ready."
+else
+    printf '\n  Next: run %sfabro-setup%s to connect your LLM account.\n' "${bold}" "${reset}"
+fi
+printf '\n'
+exit 0

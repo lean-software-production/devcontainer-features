@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Reports whether Fabro has a usable LLM credential.
+#
+#   fabro-status          human-readable summary
+#   fabro-status --quiet  no output; exit 0 if configured, 1 if not
+#
+# Credential names follow Fabro's vault conventions: an OpenAI OAuth login is
+# stored as OPENAI_CODEX, everything else as <PROVIDER>_API_KEY.
+set -uo pipefail
+
+QUIET=0
+[ "${1:-}" = "--quiet" ] && QUIET=1
+
+say() { [ "${QUIET}" -eq 1 ] || printf '%s\n' "$*"; }
+
+if ! command -v fabro >/dev/null 2>&1; then
+    say "fabro is not installed."
+    exit 1
+fi
+
+if ! fabro server status >/dev/null 2>&1; then
+    say "Fabro server is not running."
+    exit 1
+fi
+
+secrets="$(fabro secret list --json 2>/dev/null)" || secrets=""
+
+configured=""
+for name in OPENAI_CODEX OPENAI_API_KEY ANTHROPIC_API_KEY OPENROUTER_API_KEY GEMINI_API_KEY; do
+    case "${secrets}" in
+        *"\"${name}\""*) configured="${configured} ${name}" ;;
+    esac
+done
+
+if [ -z "${configured}" ]; then
+    say "No LLM provider is configured."
+    exit 1
+fi
+
+say "LLM credentials configured:${configured}"
+exit 0

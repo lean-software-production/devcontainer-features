@@ -1,0 +1,42 @@
+{
+  "id": "fabro",
+  "version": "1.0.0",
+  "name": "Fabro",
+  "description": "Installs the Fabro CLI and a guided setup wizard that connects Fabro to a ChatGPT/OpenAI account using OAuth device code, which works in Codespaces, local dev containers, and over SSH.",
+  "documentationURL": "https://github.com/lean-software-production/devcontainer-features/tree/main/src/fabro",
+  "options": {
+    "version": {
+      "type": "string",
+      "proposals": ["latest", "0.254.0"],
+      "default": "0.254.0",
+      "description": "Fabro version to install. Use 'latest' to track the newest release, or pin an exact version for reproducible containers."
+    },
+    "provider": {
+      "type": "string",
+      "enum": ["openai", "anthropic", "openrouter", "none"],
+      "default": "openai",
+      "description": "Which LLM provider the setup wizard offers first. 'openai' uses a ChatGPT/Codex subscription over OAuth device code; the others prompt for an API key."
+    },
+    "autoStartServer": {
+      "type": "boolean",
+      "default": true,
+      "description": "Start the local Fabro server automatically when the container is created."
+    },
+    "shellBanner": {
+      "type": "boolean",
+      "default": true,
+      "description": "Print a one-line 'run fabro-setup' hint in new interactive shells until setup is complete. Covers clients that do not run VS Code tasks."
+    }
+  },
+  "dependsOn": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "postCreateCommand": "/usr/local/share/fabro/bin/fabro-bootstrap",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "task.allowAutomaticTasks": "on"
+      }
+    }
+  }
+}

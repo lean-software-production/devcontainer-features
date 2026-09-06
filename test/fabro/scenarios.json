@@ -1,0 +1,13 @@
+{
+  "pinned_version": {
+    "image": "mcr.microsoft.com/devcontainers/base:bookworm",
+    "features": {
+      "fabro": {
+        "version": "0.254.0",
+        "provider": "anthropic",
+        "autoStartServer": false,
+        "shellBanner": false
+      }
+    }
+  }
+}

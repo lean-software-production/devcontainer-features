@@ -4,12 +4,14 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: "Publish to ghcr.io (uncheck for a dry run)"
+        description: "Publish to ghcr.io (uncheck to validate metadata only)"
         type: boolean
         default: true
 
 permissions:
-  contents: read
+  # contents: write is required because generate-docs commits the regenerated
+  # feature README, and the action tags the repo for each released Feature.
+  contents: write
   packages: write
 
 jobs:
@@ -21,9 +23,9 @@ jobs:
       - name: Publish features to ghcr.io
         uses: devcontainers/action@v1
         with:
-          publish-features: "true"
+          publish-features: ${{ inputs.publish }}
+          validate-only: ${{ !inputs.publish }}
           base-path-to-features: "./src"
           generate-docs: "true"
-          oci-registration: "true"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

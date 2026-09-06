@@ -9,8 +9,8 @@ on:
         default: true
 
 permissions:
-  # contents: write is required because generate-docs commits the regenerated
-  # feature README, and the action tags the repo for each released Feature.
+  # contents: write is required because the action git-tags the repo for each
+  # released Feature, and because the docs step below pushes a commit.
   contents: write
   packages: write
 
@@ -29,3 +29,20 @@ jobs:
           generate-docs: "true"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # generate-docs only writes the README files into the workspace; the
+      # action never commits them. Without this step they are discarded when
+      # the runner is torn down.
+      - name: Commit generated documentation
+        if: ${{ inputs.publish }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ./src/**/README.md
+          if git diff --cached --quiet; then
+            echo "Documentation is already up to date."
+          else
+            git commit -m "Update generated feature documentation [skip ci]"
+            git push origin HEAD:main
+          fi

@@ -11,6 +11,7 @@ set -uo pipefail
 [ -r /usr/local/share/fabro/setup.env ] && . /usr/local/share/fabro/setup.env
 . /usr/local/share/fabro/bin/fabro-common.sh
 DEFAULT_PROVIDER="${FABRO_SETUP_PROVIDER:-openai}"
+DEFAULT_MODEL="${FABRO_SETUP_MODEL:-auto}"
 MARKER="${FABRO_SETUP_MARKER:-${HOME}/.fabro/.setup-complete}"
 SETTINGS="${HOME}/.fabro/settings.toml"
 
@@ -147,15 +148,52 @@ fi
 ok "Signed in to ${provider}"
 
 # --- 6. Make it the default -------------------------------------------------
-# Pin only the provider, not a model name, so the provider's own default model
-# is used and this does not go stale as catalogs change.
-step "Setting ${provider} as the default provider"
+# Resolve the model to pin, from the `model` Feature option.
+#
+#   auto   built-in preference for the provider, and nothing for the rest
+#   none   provider only, so the provider's own default model is used
+#   <slug> that model, whatever the provider
+#
+# Under `auto`, OpenAI gets gpt-5.6-luna: it is the cheapest model in the
+# GPT-5.6 line at $1/$6 per Mtok, which suits the usage limits of a ChatGPT or
+# Codex subscription better than the sol/terra default. The other providers stay
+# provider-only so this does not go stale as their catalogs change.
+case "${DEFAULT_MODEL}" in
+    auto)
+        case "${provider}" in
+            openai) preferred_model="gpt-5.6-luna" ;;
+            *) preferred_model="" ;;
+        esac
+        ;;
+    none) preferred_model="" ;;
+    *) preferred_model="${DEFAULT_MODEL}" ;;
+esac
+
+# Only pin a model this Fabro actually serves. The version is a Feature option,
+# so an older pin may predate the slug, and a name the catalog cannot resolve
+# fails every run rather than falling back.
+model=""
+if [ -n "${preferred_model}" ]; then
+    if fabro model list --json 2>/dev/null \
+        | awk -F'"' '/"id"[[:space:]]*:/ { print $4 }' \
+        | grep -qx "${preferred_model}"; then
+        model="${preferred_model}"
+    else
+        warn "${preferred_model} is not in this Fabro's model catalog."
+        info "Pinning the provider only; ${provider} picks its own default model."
+    fi
+fi
+
+step "Setting ${provider}${model:+ / ${model}} as the default"
 tmp="$(mktemp)"
-awk -v provider="${provider}" '
+awk -v provider="${provider}" -v model="${model}" '
     /^\[run\.model\]/ { skip = 1; next }
     /^\[/ && skip && $0 !~ /^\[run\.model\./ { skip = 0 }
     !skip { print }
-    END { printf "\n[run.model]\nprovider = \"%s\"\n", provider }
+    END {
+        printf "\n[run.model]\nprovider = \"%s\"\n", provider
+        if (model != "") printf "name = \"%s\"\n", model
+    }
 ' "${SETTINGS}" > "${tmp}" && mv "${tmp}" "${SETTINGS}"
 ok "Wrote [run.model] to ~/.fabro/settings.toml"
 

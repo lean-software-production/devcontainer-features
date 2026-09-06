@@ -5,6 +5,7 @@
       "fabro": {
         "version": "0.254.0",
         "provider": "anthropic",
+        "model": "none",
         "autoStartServer": false,
         "shellBanner": false
       }

@@ -5,6 +5,7 @@ set -euo pipefail
 
 FABRO_VERSION="${VERSION:-0.254.0}"
 FABRO_PROVIDER="${PROVIDER:-openai}"
+FABRO_MODEL="${MODEL:-auto}"
 FABRO_AUTOSTART="${AUTOSTARTSERVER:-true}"
 FABRO_BANNER="${SHELLBANNER:-true}"
 
@@ -14,7 +15,7 @@ REMOTE_USER_HOME="${_REMOTE_USER_HOME:-/root}"
 SHARE_DIR=/usr/local/share/fabro
 FEATURE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "Installing Fabro (version=${FABRO_VERSION}, provider=${FABRO_PROVIDER}) for user ${REMOTE_USER}"
+echo "Installing Fabro (version=${FABRO_VERSION}, provider=${FABRO_PROVIDER}, model=${FABRO_MODEL}) for user ${REMOTE_USER}"
 
 # --- dependencies -----------------------------------------------------------
 # curl and ca-certificates are needed both to fetch the release and, later, for
@@ -76,6 +77,7 @@ ln -sf "${SHARE_DIR}/bin/fabro-status" /usr/local/bin/fabro-status
 # options are only present as env vars during this build step.
 cat > "${SHARE_DIR}/setup.env" <<EOF
 FABRO_SETUP_PROVIDER=${FABRO_PROVIDER}
+FABRO_SETUP_MODEL=${FABRO_MODEL}
 FABRO_SETUP_AUTOSTART=${FABRO_AUTOSTART}
 FABRO_SETUP_BANNER=${FABRO_BANNER}
 FABRO_SETUP_MARKER=${REMOTE_USER_HOME}/.fabro/.setup-complete

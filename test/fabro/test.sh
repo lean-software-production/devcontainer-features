@@ -20,6 +20,7 @@ check "web url is loopback outside codespaces" bash -c \
 check "web url follows codespaces host" bash -c \
   "source /usr/local/share/fabro/bin/fabro-common.sh && CODESPACE_NAME=demo GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN=app.github.dev fabro_web_url | grep -q '^https://demo-32276.app.github.dev$'"
 check "options recorded for runtime" bash -c "grep -q '^FABRO_SETUP_PROVIDER=' /usr/local/share/fabro/setup.env"
+check "model option defaults to auto" bash -c "grep -q '^FABRO_SETUP_MODEL=auto$' /usr/local/share/fabro/setup.env"
 check "shell banner wired into bashrc" bash -c "grep -q 'fabro/banner.sh' /etc/bash.bashrc"
 
 # The wizard is launched from a folderOpen task, which may or may not give it a

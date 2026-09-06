@@ -60,6 +60,11 @@ if [ -f "${SETTINGS}" ]; then
 else
     # `fabro install --non-interactive` insists on a GitHub strategy, and the
     # token strategy reads from `gh`. Get gh authenticated first if needed.
+    if ! command -v gh >/dev/null 2>&1; then
+        fail "The GitHub CLI is missing. Rebuild the dev container."
+        exit 1
+    fi
+
     if ! gh auth token >/dev/null 2>&1; then
         info "Fabro needs a GitHub token. Signing in with the GitHub CLI first."
         info "This is also a device-code flow, so it works in Codespaces."

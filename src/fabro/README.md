@@ -17,6 +17,7 @@ Installs the Fabro CLI and a guided setup wizard that connects Fabro to a ChatGP
 |-----|-----|-----|-----|
 | version | Fabro version to install. Use 'latest' to track the newest release, or pin an exact version for reproducible containers. | string | 0.254.0 |
 | provider | Which LLM provider the setup wizard offers first. 'openai' uses a ChatGPT/Codex subscription over OAuth device code; the others prompt for an API key. | string | openai |
+| model | Model pinned as the default in [run.model] once the wizard signs in. 'auto' uses the built-in preference for the chosen provider (gpt-5.6-luna for OpenAI) and the provider's own default elsewhere. 'none' pins the provider only. Any other value is used as the model slug. A model the installed Fabro's catalog does not serve is skipped rather than pinned. | string | auto |
 | autoStartServer | Start the local Fabro server automatically when the container is created. | boolean | true |
 | shellBanner | Print a one-line 'run fabro-setup' hint in new interactive shells until setup is complete. Covers clients that do not run VS Code tasks. | boolean | true |
 

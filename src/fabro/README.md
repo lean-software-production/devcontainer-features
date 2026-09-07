@@ -17,7 +17,7 @@ Installs the Fabro CLI and a guided setup wizard that connects Fabro to a ChatGP
 |-----|-----|-----|-----|
 | version | Fabro version to install. Use 'latest' to track the newest release, or pin an exact version for reproducible containers. | string | 0.254.0 |
 | provider | Which LLM provider the setup wizard offers first. 'openai' uses a ChatGPT/Codex subscription over OAuth device code; the others prompt for an API key. | string | openai |
-| model | Model pinned as the default in [run.model] once the wizard signs in. 'auto' uses the built-in preference for the chosen provider (gpt-5.6-luna for OpenAI) and the provider's own default elsewhere. 'none' pins the provider only. Any other value is used as the model slug. A model the installed Fabro's catalog does not serve is skipped rather than pinned. | string | auto |
+| model | Model passed to the Fabro server as its default once the wizard signs in. 'auto' uses the built-in preference for the chosen provider (gpt-5.6-luna for OpenAI) and the provider's own default elsewhere. 'none' pins the provider only. Any other value is used as the model slug. A model the installed Fabro's catalog does not serve is skipped rather than pinned. | string | auto |
 | autoStartServer | Start the local Fabro server automatically when the container is created. | boolean | true |
 | shellBanner | Print a one-line 'run fabro-setup' hint in new interactive shells until setup is complete. Covers clients that do not run VS Code tasks. | boolean | true |
 
@@ -42,11 +42,12 @@ the start hook the server would be down until someone ran the wizard again.
 
 ## Reaching the web UI
 
-The server listens on loopback. In a Codespace the browser reaches it through
-the forwarded host instead, so the feature sets `FABRO_WEB_URL` to
-`https://$CODESPACE_NAME-<port>.app.github.dev` when it starts the server, and
-leaves it as `http://127.0.0.1:<port>` everywhere else. Fabro uses that value
-for browser auth routes and generated links.
+The server listens on loopback. In a Codespace the HTTPS tunnel forwards to the
+server over HTTP with its public host header, so the feature sets
+`FABRO_WEB_URL` to `http://$CODESPACE_NAME-<port>.app.github.dev` when it
+starts the server, and leaves it as `http://127.0.0.1:<port>` everywhere else.
+It also stores the corresponding API and web URLs in Fabro's settings. Fabro
+uses those values for browser auth routes and generated links.
 
 Declare the port in your `devcontainer.json` so it is forwarded with a label
 rather than relying on auto-detection:

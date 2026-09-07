@@ -17,8 +17,8 @@ check "autostart no-ops before setup" bash -c "/usr/local/share/fabro/bin/fabro-
 # loopback everywhere else.
 check "web url is loopback outside codespaces" bash -c \
   "source /usr/local/share/fabro/bin/fabro-common.sh && fabro_web_url | grep -q '^http://127.0.0.1:32276$'"
-check "web url follows codespaces host" bash -c \
-  "source /usr/local/share/fabro/bin/fabro-common.sh && CODESPACE_NAME=demo GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN=app.github.dev fabro_web_url | grep -q '^https://demo-32276.app.github.dev$'"
+check "web url uses the Codespaces upstream host" bash -c \
+  "source /usr/local/share/fabro/bin/fabro-common.sh && CODESPACE_NAME=demo GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN=app.github.dev fabro_web_url | grep -q '^http://demo-32276.app.github.dev$'"
 check "options recorded for runtime" bash -c "grep -q '^FABRO_SETUP_PROVIDER=' /usr/local/share/fabro/setup.env"
 check "model option defaults to auto" bash -c "grep -q '^FABRO_SETUP_MODEL=auto$' /usr/local/share/fabro/setup.env"
 check "shell banner wired into bashrc" bash -c "grep -q 'fabro/banner.sh' /etc/bash.bashrc"

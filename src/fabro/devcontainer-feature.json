@@ -35,7 +35,7 @@
         "claude-opus-5"
       ],
       "default": "auto",
-      "description": "Model pinned as the default in [run.model] once the wizard signs in. 'auto' uses the built-in preference for the chosen provider (gpt-5.6-luna for OpenAI) and the provider's own default elsewhere. 'none' pins the provider only. Any other value is used as the model slug. A model the installed Fabro's catalog does not serve is skipped rather than pinned."
+      "description": "Model passed to the Fabro server as its default once the wizard signs in. 'auto' uses the built-in preference for the chosen provider (gpt-5.6-luna for OpenAI) and the provider's own default elsewhere. 'none' pins the provider only. Any other value is used as the model slug. A model the installed Fabro's catalog does not serve is skipped rather than pinned."
     },
     "autoStartServer": {
       "type": "boolean",

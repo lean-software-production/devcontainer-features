@@ -19,11 +19,12 @@ the start hook the server would be down until someone ran the wizard again.
 
 ## Reaching the web UI
 
-The server listens on loopback. In a Codespace the browser reaches it through
-the forwarded host instead, so the feature sets `FABRO_WEB_URL` to
-`https://$CODESPACE_NAME-<port>.app.github.dev` when it starts the server, and
-leaves it as `http://127.0.0.1:<port>` everywhere else. Fabro uses that value
-for browser auth routes and generated links.
+The server listens on loopback. In a Codespace the HTTPS tunnel forwards to the
+server over HTTP with its public host header, so the feature sets
+`FABRO_WEB_URL` to `http://$CODESPACE_NAME-<port>.app.github.dev` when it
+starts the server, and leaves it as `http://127.0.0.1:<port>` everywhere else.
+It also stores the corresponding API and web URLs in Fabro's settings. Fabro
+uses those values for browser auth routes and generated links.
 
 Declare the port in your `devcontainer.json` so it is forwarded with a label
 rather than relying on auto-detection:

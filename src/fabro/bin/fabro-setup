@@ -184,18 +184,32 @@ if [ -n "${preferred_model}" ]; then
     fi
 fi
 
-step "Setting ${provider}${model:+ / ${model}} as the default"
+step "Applying server defaults"
+# Server startup flags are authoritative for server-backed runs. Keep their
+# values in feature-owned state so autostart can restore them after restarts.
+defaults="$(fabro_server_defaults_file)"
 tmp="$(mktemp)"
-awk -v provider="${provider}" -v model="${model}" '
+{
+    printf 'provider=%s\n' "${provider}"
+    printf 'model=%s\n' "${model}"
+    printf 'environment=local\n'
+} > "${tmp}" && chmod 600 "${tmp}" && mv "${tmp}" "${defaults}"
+
+# Remove client-only defaults from earlier feature versions. The server never
+# receives them from `fabro run`, and their presence produces a warning.
+tmp="$(mktemp)"
+awk '
     /^\[run\.model\]/ { skip = 1; next }
     /^\[/ && skip && $0 !~ /^\[run\.model\./ { skip = 0 }
     !skip { print }
-    END {
-        printf "\n[run.model]\nprovider = \"%s\"\n", provider
-        if (model != "") printf "name = \"%s\"\n", model
-    }
 ' "${SETTINGS}" > "${tmp}" && mv "${tmp}" "${SETTINGS}"
-ok "Wrote [run.model] to ~/.fabro/settings.toml"
+
+if fabro_restart_server; then
+    ok "Server defaults: ${provider}${model:+ / ${model}}, local environment"
+else
+    fail "Could not restart Fabro with the selected server defaults."
+    exit 1
+fi
 
 # --- 7. Verify --------------------------------------------------------------
 step "Verifying"

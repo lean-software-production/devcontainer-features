@@ -1,6 +1,6 @@
 {
   "id": "fabro",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "name": "Fabro",
   "description": "Installs the Fabro CLI and a guided setup wizard that connects Fabro to a ChatGPT/OpenAI account using OAuth device code, which works in Codespaces, local dev containers, and over SSH.",
   "documentationURL": "https://github.com/lean-software-production/devcontainer-features/tree/main/src/fabro",

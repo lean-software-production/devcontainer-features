@@ -16,17 +16,37 @@ fabro_port() {
 
 # Canonical browser origin for the server.
 #
-# Fabro bakes this into browser auth routes and generated links. Inside a
-# Codespace the server is reachable through the forwarded host, not 127.0.0.1,
-# so FABRO_WEB_URL has to reflect that or the UI links point somewhere the
-# browser cannot follow. Anywhere else, loopback is correct.
+# Fabro serves a single canonical origin and 308s any browser request arriving
+# under a different Host, so this must match what browsers actually send -- not
+# where the server happens to be reachable from.
+#
+# The Codespaces forwarder terminates the public HTTPS name itself and proxies
+# to the container as `Host: localhost:<port>`. It reports the public name in
+# X-Forwarded-Host, which Fabro does not consult for this check. A browser on
+# the host of a dev container that publishes the port also sends
+# `Host: localhost:<port>`. Plain localhost is therefore correct in both.
+#
+# The forwarded URL is not: setting the origin to it makes Fabro redirect every
+# forwarded request back through the forwarder, which arrives as localhost
+# again -- an infinite loop the browser reports as ERR_TOO_MANY_REDIRECTS. The
+# generated default of 127.0.0.1 is wrong too; it does not match `localhost`,
+# so every request is bounced to an address the browser may not reach.
+#
+# For the address to show a human, use fabro_browse_url.
 fabro_web_url() {
+    printf 'http://localhost:%s' "$(fabro_port)"
+}
+
+# The address a human opens: the forwarded HTTPS name in a Codespace, and the
+# published port everywhere else. Display only -- never pass it as
+# FABRO_WEB_URL.
+fabro_browse_url() {
     local port
     port="$(fabro_port)"
     if [ -n "${CODESPACE_NAME:-}" ] && [ -n "${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-}" ]; then
-        printf 'http://%s-%s.%s' "${CODESPACE_NAME}" "${port}" "${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}"
+        printf 'https://%s-%s.%s' "${CODESPACE_NAME}" "${port}" "${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}"
     else
-        printf 'http://127.0.0.1:%s' "${port}"
+        printf 'http://localhost:%s' "${port}"
     fi
 }
 
@@ -56,17 +76,15 @@ fabro_server_args() {
     [ -n "${environment}" ] && FABRO_SERVER_ARGS+=(--environment "${environment}")
 }
 
-# Codespaces terminates HTTPS at its tunnel and forwards plain HTTP with the
-# public Host header. Persist that upstream origin so Fabro does not redirect
-# every tunneled request back through the same public URL.
-fabro_sync_codespaces_urls() {
-    [ -n "${CODESPACE_NAME:-}" ] || return 0
-    [ -n "${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN:-}" ] || return 0
-
+# FABRO_WEB_URL is runtime-only: it sets the origin for the process it starts
+# and is never written back. Persist the same value so that a later
+# `fabro server restart` by hand does not silently fall back to the 127.0.0.1
+# origin that `fabro install` generates.
+fabro_sync_server_urls() {
     local settings origin api_url tmp
     settings="${HOME}/.fabro/settings.toml"
     [ -f "${settings}" ] || return 0
-    origin="http://${CODESPACE_NAME}-$(fabro_port).${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}"
+    origin="$(fabro_web_url)"
     api_url="${origin}/api/v1"
     tmp="$(mktemp "${settings}.tmp.XXXXXX")" || return 1
 
@@ -96,14 +114,14 @@ fabro_sync_codespaces_urls() {
 
 # Start the server if it is not already up, with its persisted setup defaults.
 fabro_start_server() {
-    fabro_sync_codespaces_urls || return 1
+    fabro_sync_server_urls || return 1
     fabro server status >/dev/null 2>&1 && return 0
     fabro_server_args
     FABRO_WEB_URL="$(fabro_web_url)" fabro server start "${FABRO_SERVER_ARGS[@]}" >/dev/null 2>&1
 }
 
 fabro_restart_server() {
-    fabro_sync_codespaces_urls || return 1
+    fabro_sync_server_urls || return 1
     fabro_server_args
     FABRO_WEB_URL="$(fabro_web_url)" fabro server restart "${FABRO_SERVER_ARGS[@]}"
 }

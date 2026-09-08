@@ -13,12 +13,20 @@ check "shared helpers installed" bash -c "test -r /usr/local/share/fabro/bin/fab
 # With no settings.toml it must be a silent no-op, not an error.
 check "autostart no-ops before setup" bash -c "/usr/local/share/fabro/bin/fabro-autostart"
 
-# The web origin must follow the environment: forwarded host in a Codespace,
-# loopback everywhere else.
-check "web url is loopback outside codespaces" bash -c \
-  "source /usr/local/share/fabro/bin/fabro-common.sh && fabro_web_url | grep -q '^http://127.0.0.1:32276$'"
-check "web url uses the Codespaces upstream host" bash -c \
-  "source /usr/local/share/fabro/bin/fabro-common.sh && CODESPACE_NAME=demo GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN=app.github.dev fabro_web_url | grep -q '^http://demo-32276.app.github.dev$'"
+# The canonical origin must match the Host browsers actually send, which is
+# localhost in a Codespace (the forwarder proxies in as localhost) and on a
+# published dev container port alike. Pointing it at the forwarded name sends
+# the browser into a redirect loop, so this must not vary by environment.
+check "web url is localhost outside codespaces" bash -c \
+  "source /usr/local/share/fabro/bin/fabro-common.sh && unset CODESPACE_NAME GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN && fabro_web_url | grep -q '^http://localhost:32276$'"
+check "web url stays localhost inside a codespace" bash -c \
+  "source /usr/local/share/fabro/bin/fabro-common.sh && CODESPACE_NAME=demo GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN=app.github.dev fabro_web_url | grep -q '^http://localhost:32276$'"
+
+# The address shown to a human is the forwarded name, and is display-only.
+check "browse url is localhost outside codespaces" bash -c \
+  "source /usr/local/share/fabro/bin/fabro-common.sh && unset CODESPACE_NAME GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN && fabro_browse_url | grep -q '^http://localhost:32276$'"
+check "browse url uses the forwarded host in a codespace" bash -c \
+  "source /usr/local/share/fabro/bin/fabro-common.sh && CODESPACE_NAME=demo GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN=app.github.dev fabro_browse_url | grep -q '^https://demo-32276.app.github.dev$'"
 check "options recorded for runtime" bash -c "grep -q '^FABRO_SETUP_PROVIDER=' /usr/local/share/fabro/setup.env"
 check "model option defaults to auto" bash -c "grep -q '^FABRO_SETUP_MODEL=auto$' /usr/local/share/fabro/setup.env"
 check "shell banner wired into bashrc" bash -c "grep -q 'fabro/banner.sh' /etc/bash.bashrc"

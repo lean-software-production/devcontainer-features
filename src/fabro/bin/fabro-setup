@@ -95,7 +95,7 @@ step "Starting the local Fabro server"
 if fabro server status >/dev/null 2>&1; then
     ok "Already running"
 elif FABRO_WEB_URL="$(fabro_web_url)" fabro server start; then
-    ok "Started at $(fabro_web_url)"
+    ok "Started at $(fabro_browse_url)"
 else
     fail "The server did not start. Check 'fabro server start' output above."
     exit 1

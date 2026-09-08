@@ -19,12 +19,29 @@ the start hook the server would be down until someone ran the wizard again.
 
 ## Reaching the web UI
 
-The server listens on loopback. In a Codespace the HTTPS tunnel forwards to the
-server over HTTP with its public host header, so the feature sets
-`FABRO_WEB_URL` to `http://$CODESPACE_NAME-<port>.app.github.dev` when it
-starts the server, and leaves it as `http://127.0.0.1:<port>` everywhere else.
-It also stores the corresponding API and web URLs in Fabro's settings. Fabro
-uses those values for browser auth routes and generated links.
+The server listens on loopback, and Fabro serves a single canonical origin: any
+browser request arriving under a different `Host` gets a `308` to that origin.
+The origin therefore has to match what browsers actually send, which is not the
+same thing as where the server is reachable from.
+
+In a Codespace the forwarder terminates the public HTTPS name itself and proxies
+into the container as `Host: localhost:<port>`, reporting the public name in
+`X-Forwarded-Host` -- a header Fabro does not consult for this check. A browser
+on the host of a dev container that publishes the port also sends
+`Host: localhost:<port>`. So the feature sets `FABRO_WEB_URL` to
+`http://localhost:<port>` in both cases, and persists the matching API and web
+URLs into Fabro's settings, because `FABRO_WEB_URL` applies only to the process
+it starts and is never written back.
+
+Both obvious-looking alternatives break the web UI:
+
+| Canonical origin | Result |
+| --- | --- |
+| `http://127.0.0.1:<port>` | does not match `localhost`, so every browser request is bounced to an address the browser may not be able to reach |
+| `https://$CODESPACE_NAME-<port>.app.github.dev` | the redirect goes back through the forwarder, which arrives as `localhost` again -- an infinite loop, reported as `ERR_TOO_MANY_REDIRECTS` |
+
+The forwarded URL is still the address you *open* in a Codespace. It is just not
+the origin the server should advertise.
 
 Declare the port in your `devcontainer.json` so it is forwarded with a label
 rather than relying on auto-detection:

@@ -15,5 +15,23 @@ jobs:
       - name: Install the dev container CLI
         run: npm install -g @devcontainers/cli
 
-      - name: Test the fabro feature
+      - name: Test Fabro
         run: devcontainer features test --features fabro --skip-duplicated .
+
+      - name: Test Pi
+        run: >-
+          devcontainer features test --features pi
+          --base-image mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie
+          --remote-user node --skip-duplicated .
+
+      - name: Test Claude Code
+        run: >-
+          devcontainer features test --features claude-code
+          --base-image mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie
+          --remote-user node --skip-duplicated .
+
+      - name: Test Codex
+        run: >-
+          devcontainer features test --features codex
+          --base-image mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie
+          --remote-user node --skip-duplicated .

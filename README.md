@@ -1,7 +1,7 @@
 # Dev Container Features
 
 Reusable [Dev Container Features](https://containers.dev/implementors/features/)
-for projects that use [Fabro](https://fabro.sh).
+for coding-agent workflows.
 
 ## `fabro`
 
@@ -23,6 +23,43 @@ you want the wizard to open automatically when the project is opened.
 
 See [src/fabro](src/fabro) for options and details.
 
+## Coding agents
+
+`pi`, `claude-code`, and `codex` are separate, composable Features. They do
+not install, pin, or share a Node.js runtime: select a compatible Node.js base
+image or add the official Node Feature in the consuming configuration. Each
+Feature installs only its own CLI globally, defaults `version` to rolling npm
+`latest`, accepts an exact version pin for reproducibility, and leaves
+authentication to the remote user after the container is created.
+
+```jsonc
+// .devcontainer/devcontainer.json
+{
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie",
+  "features": {
+    "ghcr.io/lean-software-production/devcontainer-features/pi:1": {
+      "version": "0.86.0"
+    },
+    "ghcr.io/lean-software-production/devcontainer-features/claude-code:1": {
+      "version": "2.1.278"
+    },
+    "ghcr.io/lean-software-production/devcontainer-features/codex:1": {
+      "version": "0.155.1"
+    }
+  }
+}
+```
+
+Use only the Features you need. The exact versions shown above are optional
+reproducibility pins; omit `version` to use the rolling `latest` default. No
+credentials are embedded, installed, or shared between these Features.
+
+| Feature | Post-create authentication | Documentation |
+| --- | --- | --- |
+| Pi | Run `pi`, then `/login` in the Pi prompt. | [Pi notes](src/pi/NOTES.md) |
+| Claude Code | Run `claude` and follow its interactive sign-in. | [Claude Code notes](src/claude-code/NOTES.md) |
+| OpenAI Codex CLI | Run `codex login --device-auth` in Codespaces or another browser-based remote container. | [Codex notes](src/codex/NOTES.md) |
+
 ## Publishing
 
 Features are published to `ghcr.io` as OCI artifacts by the
@@ -39,4 +76,7 @@ Consumers pinning `:1` pick up minor and patch releases automatically.
 ```sh
 npm install -g @devcontainers/cli
 devcontainer features test --features fabro --skip-duplicated .
+devcontainer features test --features pi claude-code codex \
+  --base-image mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie \
+  --remote-user node --skip-duplicated .
 ```

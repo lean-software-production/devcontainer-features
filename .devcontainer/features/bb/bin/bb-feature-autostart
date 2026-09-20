@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+set -euo pipefail
+. /usr/local/share/bb/bin/bb-feature-common.sh
+
+bb_feature_validate_options
+[ "$BB_FEATURE_MODE" = standalone ] && [ "$BB_FEATURE_AUTOSTART" = true ] || exit 0
+bb_feature_prepare_data_dir
+
+bb_feature_runtime_file="$BB_FEATURE_RUNTIME_DIR/launcher.tsv"
+
+lock_file="$BB_FEATURE_RUNTIME_DIR/autostart.lock"
+[ ! -L "$lock_file" ] || { bb_feature_fail "autostart lock is a symlink"; exit 1; }
+umask 077
+: > "$lock_file"
+chmod 0600 "$lock_file"
+exec 9>"$lock_file"
+# A start may wait 30 seconds for each existing/new launcher plus cleanup.
+flock -w 90 9 || { bb_feature_fail "another BB autostart is still running"; exit 1; }
+
+# Refresh the browser origin while holding the lifecycle lock. This preserves
+# user config keys and avoids two start hooks racing a config write.
+bb_feature_apply_origin
+
+if bb_feature_owned_launcher_alive; then
+    # Give an owned launcher the same readiness budget as a fresh start. Do not
+    # restart it merely because the server is ahead of a recovering daemon.
+    if bb_feature_wait_ready "$BB_FEATURE_PID"; then exit 0; fi
+    # The record identifies a launcher we started, running as this user, with
+    # this exact binary and state. Never stop a listener merely by port number.
+    kill -TERM "$BB_FEATURE_PID" 2>/dev/null || true
+    for _ in $(seq 1 10); do kill -0 "$BB_FEATURE_PID" 2>/dev/null || break; sleep 1; done
+    kill -0 "$BB_FEATURE_PID" 2>/dev/null && { bb_feature_fail "our recorded BB launcher did not exit; see $BB_FEATURE_RUNTIME_DIR/launcher.log"; exit 1; }
+    rm -f -- "$bb_feature_runtime_file"
+elif [ -e "$bb_feature_runtime_file" ]; then
+    # A stale record is Feature-owned metadata, not a bb-app lock or socket.
+    bb_feature_read_runtime >/dev/null 2>&1 || { bb_feature_fail "refusing to replace an unsafe runtime record"; exit 1; }
+    rm -f -- "$bb_feature_runtime_file"
+fi
+
+if bb_feature_health; then
+    bb_feature_fail "port ${BB_FEATURE_SERVER_PORT} already has a healthy server, but it is not this Feature's recorded launcher; choose another port or stop it yourself"
+    exit 1
+fi
+
+log_file="$BB_FEATURE_RUNTIME_DIR/launcher.log"
+# The detached process must not retain fd 9: that would keep this hook's lock
+# held for the launcher's lifetime and block every subsequent start.
+nohup env -i HOME="$HOME" USER="${USER:-$(id -un)}" LOGNAME="${LOGNAME:-$(id -un)}" PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+    "$BB_FEATURE_APP_BIN" --data-dir "$BB_FEATURE_DATA_DIR" --server-bind-host 127.0.0.1 --server-port "$BB_FEATURE_SERVER_PORT" --host-daemon-port "$BB_FEATURE_DAEMON_PORT" \
+    >> "$log_file" 2>&1 </dev/null 9>&- &
+launcher_pid=$!
+bb_feature_write_runtime "$launcher_pid"
+
+bb_feature_wait_ready "$launcher_pid" && exit 0
+if bb_feature_owned_launcher_alive; then kill -TERM "$BB_FEATURE_PID" 2>/dev/null || true; fi
+rm -f -- "$bb_feature_runtime_file"
+bb_feature_fail "BB server and host daemon did not become ready within 30 seconds; inspect $log_file"
+exit 1

@@ -3,7 +3,7 @@
   "image": "mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie",
   "remoteUser": "node",
   "features": {
-    "../src/bb": {
+    "./features/bb": {
       "version": "0.43.3",
       "mode": "standalone",
       "autoStart": true,
@@ -12,11 +12,13 @@
       "hostDaemonPort": "38887",
       "appUrl": "auto"
     },
-    "../src/codex": {
+    "./features/codex": {
       "version": "0.155.1"
     }
   },
-  "forwardPorts": [38886],
+  "forwardPorts": [
+    38886
+  ],
   "portsAttributes": {
     "38886": {
       "label": "BB standalone UI",

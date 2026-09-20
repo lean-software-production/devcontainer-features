@@ -60,6 +60,16 @@ credentials are embedded, installed, or shared between these Features.
 | Claude Code | Run `claude` and follow its interactive sign-in. | [Claude Code notes](src/claude-code/NOTES.md) |
 | OpenAI Codex CLI | Run `codex login --device-auth` in Codespaces or another browser-based remote container. | [Codex notes](src/codex/NOTES.md) |
 
+## BB standalone Codespaces
+
+[`bb`](src/bb) installs BB's npm distribution in a Feature-owned prefix. Its
+default `cli` mode adds no server lifecycle. Opt into `standalone` plus
+`autoStart` when a single Codespace user needs the private, loopback-only BB UI
+and local workers; use the [copyable example](examples/bb-standalone) as the
+consumer template. Keep the forwarded server port owner-private in GitHub's
+Ports UI and do not forward the host-daemon port. See the [BB notes](src/bb/NOTES.md)
+for security, persistence, provider-login, and live acceptance boundaries.
+
 ## Publishing
 
 Features are published to `ghcr.io` as OCI artifacts by the

@@ -1,0 +1,30 @@
+{
+  "name": "BB standalone (local Feature validation)",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie",
+  "features": {
+    "../../src/bb": {
+      "version": "0.43.3",
+      "mode": "standalone",
+      "autoStart": true,
+      "dataDir": "/workspaces/.bb-state",
+      "serverPort": "38886",
+      "hostDaemonPort": "38887",
+      "appUrl": "auto"
+    },
+    "../../src/codex": {
+      "version": "0.155.1"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "forwardPorts": [38886],
+  "portsAttributes": {
+    "38886": {
+      "label": "BB standalone UI",
+      "protocol": "http",
+      "onAutoForward": "notify"
+    }
+  },
+  "otherPortsAttributes": {
+    "onAutoForward": "ignore"
+  }
+}

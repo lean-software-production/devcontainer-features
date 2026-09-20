@@ -1,0 +1,47 @@
+## Requirements
+
+Pi is installed from its official npm package and requires **Node.js 22.19.0 or
+newer** plus npm. This Feature deliberately does not install or select Node.js:
+the consuming image owns the runtime version. It declares an install ordering
+preference for the Dev Container Node Feature and stops with a clear error when
+`node` or `npm` is absent or Node is too old.
+
+## First run and authentication
+
+Open an integrated terminal in the repository and start Pi:
+
+```sh
+pi
+```
+
+At the Pi prompt, run:
+
+```text
+/login
+```
+
+Choose a supported subscription provider (including ChatGPT Plus/Pro (Codex),
+Claude Pro/Max, or GitHub Copilot), or choose an API-key provider. Complete the
+browser authorization that Pi presents. This terminal-driven flow is suitable
+for GitHub Codespaces and other remote Dev Containers: no credential is needed
+or collected while the image is built.
+
+Pi stores credentials and refreshed OAuth tokens for the remote user in
+`~/.pi/agent/auth.json`, with restrictive permissions. They survive a normal
+container stop/start when the container filesystem is retained, but a rebuild
+typically creates a fresh filesystem and requires `/login` again. Do not add
+that directory or an API key to the repository or image.
+
+For non-interactive install verification, run:
+
+```sh
+pi --version
+```
+
+The feature uses Pi's documented `npm install -g --ignore-scripts` installation
+form. Set `version` to `latest` to follow npm's latest release; the default is
+the exact package version `0.86.0` for reproducible builds.
+
+See the official [Pi quickstart](https://pi.dev/docs/latest/quickstart) and
+[provider documentation](https://pi.dev/docs/latest/providers) for current
+provider details.

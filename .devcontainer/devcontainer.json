@@ -7,7 +7,7 @@
       "version": "0.43.3",
       "mode": "standalone",
       "autoStart": true,
-      "dataDir": "/workspaces/.bb-state",
+      "dataDir": "${containerWorkspaceFolder}/.bb-state",
       "serverPort": "38886",
       "hostDaemonPort": "38887",
       "appUrl": "auto"

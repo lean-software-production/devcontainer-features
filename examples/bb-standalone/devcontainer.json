@@ -2,16 +2,16 @@
   "name": "BB standalone (local Feature validation)",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie",
   "features": {
-    "../../src/bb": {
+    "./features/bb": {
       "version": "0.43.3",
       "mode": "standalone",
       "autoStart": true,
-      "dataDir": "/workspaces/.bb-state",
+      "dataDir": "${containerWorkspaceFolder}/.bb-state",
       "serverPort": "38886",
       "hostDaemonPort": "38887",
       "appUrl": "auto"
     },
-    "../../src/codex": {
+    "ghcr.io/lean-software-production/devcontainer-features/codex:1": {
       "version": "0.155.1"
     },
     "ghcr.io/devcontainers/features/github-cli:1": {}

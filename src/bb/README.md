@@ -12,15 +12,17 @@ local workers for the remote user in a Codespace.
     "ghcr.io/lean-software-production/devcontainer-features/bb:1": {
       "mode": "standalone",
       "autoStart": true,
-      "dataDir": "/workspaces/.bb-state"
+      "dataDir": "${containerWorkspaceFolder}/.bb-state"
     }
   }
 }
 ```
 
 The OCI reference above is for a future published Feature. Until it is
-published, use this repository's [copyable example](../../examples/bb-standalone)
-and its local `../../src/bb` Feature path while validating from a checkout.
+published, use this repository's [copyable example](../../examples/bb-standalone),
+which explains how to copy `src/bb` beneath a consumer's `.devcontainer`
+directory for local validation. Add `/.bb-state/` to the consumer repository's
+`.gitignore` when using the example state path.
 
 ## Options
 

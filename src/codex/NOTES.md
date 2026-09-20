@@ -1,8 +1,9 @@
 ## Requirements
 
 This Feature intentionally does not install Node.js. Use a Node.js base image or
-add a Node Feature in the consuming `devcontainer.json`; `installsAfter: ["node"]`
-ensures the Feature runs after a Node Feature when both are selected. The
+add a Node Feature in the consuming `devcontainer.json`;
+`installsAfter: ["ghcr.io/devcontainers/features/node"]` ensures the Feature
+runs after a Node Feature when both are selected. The
 installer requires `node`, `npm`, and Node.js 16 or later. The official npm
 package currently provides Linux x64 and arm64 distributions.
 

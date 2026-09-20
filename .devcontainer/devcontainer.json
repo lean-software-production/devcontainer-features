@@ -12,7 +12,7 @@
       "hostDaemonPort": "38887",
       "appUrl": "auto"
     },
-    "./features/codex": {
+    "ghcr.io/lean-software-production/devcontainer-features/codex:1": {
       "version": "0.155.1"
     }
   },

@@ -36,6 +36,9 @@ claude
 
 Follow Claude Code's browser prompts to sign in with an eligible Claude
 subscription (Pro, Max, Team, or Enterprise) or an Anthropic Console account.
+In GitHub Codespaces, open the URL Claude prints in your local browser and
+complete the sign-in there; do not attempt to embed browser credentials in the
+container configuration.
 An `ANTHROPIC_API_KEY` supplied at runtime is also supported by Claude Code; it
 will ask for one-time approval rather than opening a browser. Enterprise
 deployments can instead configure their supported cloud provider according to

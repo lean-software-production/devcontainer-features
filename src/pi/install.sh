@@ -69,6 +69,7 @@ fi
 # Global npm prefixes vary by base image. Ensure a conventional system path
 # exposes Pi to the non-root remote user as well as to root.
 if [ "${PI_BIN}" != "/usr/local/bin/pi" ]; then
+    install -d -m 0755 /usr/local/bin
     ln -sf "${PI_BIN}" /usr/local/bin/pi
 fi
 

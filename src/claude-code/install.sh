@@ -37,9 +37,15 @@ fi
 echo "Installing Claude Code (${CLAUDE_CODE_VERSION}) with Node.js ${node_version}"
 npm install --global --no-audit --no-fund "${package_spec}"
 
-if ! command -v claude >/dev/null 2>&1; then
-    fail "Claude Code installation completed but 'claude' is not on PATH. Check npm's global bin configuration."
+NPM_GLOBAL_PREFIX="$(npm prefix --global)"
+CLAUDE_BIN="${NPM_GLOBAL_PREFIX}/bin/claude"
+if [ ! -x "${CLAUDE_BIN}" ]; then
+    fail "npm completed but did not install an executable Claude Code CLI at ${CLAUDE_BIN}."
 fi
 
-claude --version
+install -d -m 0755 /usr/local/bin
+if [ "${CLAUDE_BIN}" != "/usr/local/bin/claude" ]; then
+    ln -sf "${CLAUDE_BIN}" /usr/local/bin/claude
+fi
+/usr/local/bin/claude --version
 echo "Claude Code installed. Run 'claude' as the remote user to authenticate."

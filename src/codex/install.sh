@@ -51,6 +51,8 @@ if [ ! -x "${CODEX_BIN}" ]; then
     fail "npm completed but did not install an executable Codex CLI at ${CODEX_BIN}."
 fi
 install -d -m 0755 /usr/local/bin
-ln -sf "${CODEX_BIN}" /usr/local/bin/codex
+if [ "${CODEX_BIN}" != "/usr/local/bin/codex" ]; then
+    ln -sf "${CODEX_BIN}" /usr/local/bin/codex
+fi
 
 echo "Installed $(/usr/local/bin/codex --version)"

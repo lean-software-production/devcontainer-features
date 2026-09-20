@@ -2,8 +2,8 @@
 set -e
 source dev-container-features-test-lib
 
-check "Claude Code on PATH" bash -c "command -v claude"
-check "Claude Code reports the pinned version" bash -c "claude --version | grep -Eq '^2\\.1\\.278( |$)'"
-check "Claude Code is executable by the non-root Node image user" bash -c "runuser -u node -- claude --version | grep -Eq '^2\\.1\\.278( |$)'"
+check "test runs as the node remote user" bash -c 'test "$(id -un)" = node'
+check "Claude Code is on the node user's PATH" bash -c "command -v claude"
+check "default Claude Code runs as the node user" bash -c "claude --version | grep -Eq '^2\\.1\\.278( |$)'"
 
 reportResults

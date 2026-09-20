@@ -56,6 +56,6 @@ filesystem persists. A rebuild creates a new image/container filesystem, so
 expect to authenticate again unless the user deliberately provides their own
 secure persistent home-directory storage.
 
-See the official [Codex CLI documentation](https://developers.openai.com/es-419/docs/codex/cli)
-and [authentication guidance](https://developers.openai.com/es-419/docs/auth)
+See the official [Codex CLI documentation](https://developers.openai.com/codex/cli)
+and [authentication guidance](https://learn.chatgpt.com/docs/auth)
 for current installation and login behavior.

@@ -1,13 +1,13 @@
 {
   "default_version": {
-    "image": "mcr.microsoft.com/devcontainers/javascript-node:1-24-bookworm",
+    "image": "mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie",
     "remoteUser": "node",
     "features": {
       "claude-code": {}
     }
   },
   "pinned_version": {
-    "image": "mcr.microsoft.com/devcontainers/javascript-node:1-24-bookworm",
+    "image": "mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie",
     "remoteUser": "node",
     "features": {
       "claude-code": {

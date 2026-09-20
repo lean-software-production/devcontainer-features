@@ -35,7 +35,7 @@ after the container is created.
 ```jsonc
 // .devcontainer/devcontainer.json
 {
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-24-bookworm",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie",
   "features": {
     "ghcr.io/lean-software-production/devcontainer-features/pi:1": {
       "version": "0.86.0"
@@ -77,6 +77,6 @@ Consumers pinning `:1` pick up minor and patch releases automatically.
 npm install -g @devcontainers/cli
 devcontainer features test --features fabro --skip-duplicated .
 devcontainer features test --features pi claude-code codex \
-  --base-image mcr.microsoft.com/devcontainers/javascript-node:1-24-bookworm \
+  --base-image mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie \
   --remote-user node --skip-duplicated .
 ```

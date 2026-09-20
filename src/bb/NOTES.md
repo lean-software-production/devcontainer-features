@@ -71,7 +71,10 @@ start.
 
 The helper serializes starts with a user-owned lock, records only the exact
 launcher PID it created, verifies PID owner, executable and data directory
-before recovery, and waits up to 30 seconds (plus a bounded final probe) for
+before recovery, and starts that launcher in a new session so Codespaces
+lifecycle process-group cleanup does not terminate it. A PID handoff preserves
+the real `bb-app` PID even when `setsid` needs an intermediate fork. The helper
+waits up to 30 seconds (plus a bounded final probe) for
 both server `/health` and a TCP connection to the configured loopback host-daemon
 port. The same readiness rule applies to an existing launcher and to status;
 a healthy HTTP server alone is not sufficient. After verifying its launcher is

@@ -43,12 +43,70 @@ if bb_feature_health; then
 fi
 
 log_file="$BB_FEATURE_RUNTIME_DIR/launcher.log"
-# The detached process must not retain fd 9: that would keep this hook's lock
-# held for the launcher's lifetime and block every subsequent start.
-nohup env -i HOME="$HOME" USER="${USER:-$(id -un)}" LOGNAME="${LOGNAME:-$(id -un)}" PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+# Codespaces terminates the lifecycle command's process group after hooks
+# finish. Start BB in a new session and close fd 9 so it survives that cleanup
+# without retaining this hook's lifecycle lock. GNU setsid may fork when its
+# caller is already a process-group leader, so do not assume $! is BB's PID.
+# The session shell reports its own PID immediately before exec; exec then
+# preserves that PID for the long-lived bb-app process.
+pid_handoff="$(mktemp "$BB_FEATURE_RUNTIME_DIR/launcher-start.XXXXXX")"
+chmod 0600 "$pid_handoff"
+cleanup_handoff() { rm -f -- "$pid_handoff"; }
+trap cleanup_handoff EXIT
+nohup setsid sh -c '
+    pid_handoff=$1
+    shift
+    printf "%s\n" "$$" > "$pid_handoff"
+    exec "$@"
+' bb-feature-session "$pid_handoff" \
+    env -i HOME="$HOME" USER="${USER:-$(id -un)}" LOGNAME="${LOGNAME:-$(id -un)}" PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
     "$BB_FEATURE_APP_BIN" --data-dir "$BB_FEATURE_DATA_DIR" --server-bind-host 127.0.0.1 --server-port "$BB_FEATURE_SERVER_PORT" --host-daemon-port "$BB_FEATURE_DAEMON_PORT" \
     >> "$log_file" 2>&1 </dev/null 9>&- &
-launcher_pid=$!
+session_bootstrap_pid=$!
+
+launcher_pid=
+for _ in $(seq 1 50); do
+    if IFS= read -r candidate < "$pid_handoff" && [[ "$candidate" =~ ^[0-9]+$ ]]; then
+        launcher_pid="$candidate"
+        break
+    fi
+    sleep .1
+done
+rm -f -- "$pid_handoff"
+trap - EXIT
+if [ -z "$launcher_pid" ]; then
+    bootstrap_command="$(tr '\000' ' ' < "/proc/$session_bootstrap_pid/cmdline" 2>/dev/null || true)"
+    if [ "$(stat -c %u -- "/proc/$session_bootstrap_pid" 2>/dev/null || true)" = "$(id -u)" ] \
+        && [[ "$bootstrap_command" == *"$pid_handoff"* ]]; then
+        kill -TERM "$session_bootstrap_pid" 2>/dev/null || true
+    fi
+    bb_feature_fail "BB session launcher did not report its PID; inspect $log_file"
+    exit 1
+fi
+
+# Do not persist the handoff until the same PID has exec'd the configured app.
+# This preserves the existing exact-binary/data-dir ownership contract even
+# when setsid used an intermediate fork.
+launcher_identified=false
+for _ in $(seq 1 50); do
+    kill -0 "$launcher_pid" 2>/dev/null || break
+    command_line="$(tr '\000' ' ' < "/proc/$launcher_pid/cmdline" 2>/dev/null || true)"
+    if [ "$(stat -c %u -- "/proc/$launcher_pid" 2>/dev/null || true)" = "$(id -u)" ] \
+        && [[ "$command_line" == *"$BB_FEATURE_APP_BIN"* ]] \
+        && [[ "$command_line" == *"--data-dir $BB_FEATURE_DATA_DIR"* ]]; then
+        launcher_identified=true
+        break
+    fi
+    sleep .1
+done
+if [ "$launcher_identified" != true ]; then
+    command_line="$(tr '\000' ' ' < "/proc/$launcher_pid/cmdline" 2>/dev/null || true)"
+    if [[ "$command_line" == *"$BB_FEATURE_APP_BIN"* ]] || [[ "$command_line" == *"bb-feature-session"* ]]; then
+        kill -TERM "$launcher_pid" 2>/dev/null || true
+    fi
+    bb_feature_fail "BB session launcher did not exec the configured app; inspect $log_file"
+    exit 1
+fi
 bb_feature_write_runtime "$launcher_pid"
 
 bb_feature_wait_ready "$launcher_pid" && exit 0

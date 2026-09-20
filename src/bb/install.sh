@@ -62,6 +62,7 @@ command -v python3 >/dev/null 2>&1 || missing_packages+=(python3)
 command -v make >/dev/null 2>&1 || missing_packages+=(make)
 command -v g++ >/dev/null 2>&1 || missing_packages+=(g++)
 command -v curl >/dev/null 2>&1 || missing_packages+=(curl)
+command -v setsid >/dev/null 2>&1 || missing_packages+=(util-linux)
 if [ "${#missing_packages[@]}" -gt 0 ]; then
     apt-get update -y
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates "${missing_packages[@]}"

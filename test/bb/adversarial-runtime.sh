@@ -112,6 +112,57 @@ EOF
   chmod 644 "$share/options.tsv"
 }
 
+# Force GNU setsid's intermediate-fork path so the PID handoff is exercised,
+# then terminate the lifecycle session/process group after autostart returns.
+# BB must remain in its own session with the exact recorded app PID.
+session_state="$fixture/session-survival"
+mkdir "$session_state" "$fixture/forced-setsid"
+cat > "$fixture/forced-setsid/setsid" <<'FORCED_SETSID'
+#!/usr/bin/env bash
+exec /usr/bin/setsid --fork "$@"
+FORCED_SETSID
+chmod 755 "$fixture/forced-setsid/setsid"
+write_options 49286 49287 https://bb.example.test "$session_state"
+HOME="$fixture/home" "$share/bin/bb-feature-bootstrap"
+lifecycle_pid_file="$fixture/lifecycle.pid"
+lifecycle_returned="$fixture/lifecycle-returned"
+setsid bash -c '
+  set -e
+  printf "%s\n" "$$" > "$1"
+  PATH="$2:$PATH" HOME="$3" "$4"
+  : > "$5"
+  sleep 30
+' bb-lifecycle "$lifecycle_pid_file" "$fixture/forced-setsid" "$fixture/home" \
+  "$share/bin/bb-feature-autostart" "$lifecycle_returned" &
+lifecycle_job=$!
+for _ in $(seq 1 400); do
+  [ -e "$lifecycle_returned" ] && break
+  kill -0 "$lifecycle_job" 2>/dev/null || { echo 'lifecycle exited before autostart returned' >&2; exit 1; }
+  sleep .1
+done
+test -e "$lifecycle_returned"
+lifecycle_pid="$(cat "$lifecycle_pid_file")"
+session_pid="$(awk -F '\t' '$1=="PID"{print $2}' "$session_state/.bb-feature/launcher.tsv")"
+session_command="$(tr '\000' ' ' < "/proc/$session_pid/cmdline")"
+[[ "$session_command" == *"$share/npm/bin/bb-app"* ]]
+[[ "$session_command" == *"--data-dir $session_state"* ]]
+test "$(ps -o sid= -p "$session_pid" | tr -d ' ')" = "$session_pid"
+test "$(ps -o sid= -p "$lifecycle_pid" | tr -d ' ')" = "$lifecycle_pid"
+test "$session_pid" != "$lifecycle_pid"
+kill -TERM -- "-$lifecycle_pid"
+wait "$lifecycle_job" 2>/dev/null || true
+for _ in $(seq 1 50); do kill -0 "$lifecycle_pid" 2>/dev/null || break; sleep .1; done
+! kill -0 "$lifecycle_pid" 2>/dev/null
+HOME="$fixture/home" "$share/bin/bb-feature-status"
+test "$session_pid" = "$(awk -F '\t' '$1=="PID"{print $2}' "$session_state/.bb-feature/launcher.tsv")"
+
+# Clean up only the recorded fixture process, with a bounded wait.
+kill -TERM "$session_pid"
+for _ in $(seq 1 100); do kill -0 "$session_pid" 2>/dev/null || break; sleep .1; done
+! kill -0 "$session_pid" 2>/dev/null
+rm "$session_state/.bb-feature/launcher.tsv"
+echo 'BB survives lifecycle session cleanup with its real PID; cleanup is bounded'
+
 write_options 49386 49387 https://bb.example.test "$state"
 HOME="$fixture/home" "$share/bin/bb-feature-bootstrap"
 grep -F 'https://bb.example.test' "$state/config.json"

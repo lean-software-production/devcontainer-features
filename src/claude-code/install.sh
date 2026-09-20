@@ -3,7 +3,7 @@
 # time; Feature option values arrive as upper-cased environment variables.
 set -euo pipefail
 
-CLAUDE_CODE_VERSION="${VERSION:-2.1.278}"
+CLAUDE_CODE_VERSION="${VERSION:-latest}"
 MINIMUM_NODE_MAJOR=22
 
 fail() {

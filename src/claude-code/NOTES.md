@@ -13,10 +13,9 @@ Feature ahead of this one:
 }
 ```
 
-The default is the exact npm release `2.1.278`, selected from the npm registry
-when this feature was authored. This makes rebuilds reproducible. Set
-`"version": "latest"` only when the container should follow the npm `latest`
-tag. The feature installs the executable into npm's global prefix, normally
+The default is npm's rolling `latest` release. Set `"version"` to an exact
+release such as `2.1.278` when the container must be reproducible. The feature
+installs the executable into npm's global prefix, normally
 `/usr/local/bin`, with world-executable permissions so the non-root remote user
 can run `claude`.
 

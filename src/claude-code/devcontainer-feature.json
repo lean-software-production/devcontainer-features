@@ -11,8 +11,8 @@
         "latest",
         "2.1.278"
       ],
-      "default": "2.1.278",
-      "description": "Claude Code npm version to install. Use an exact version for reproducible containers, or 'latest' to follow the npm latest tag."
+      "default": "latest",
+      "description": "Claude Code npm version to install. 'latest' is the rolling default; use an exact version for reproducible containers."
     }
   },
   "installsAfter": [

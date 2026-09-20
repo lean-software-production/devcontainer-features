@@ -14,8 +14,8 @@
         "latest",
         "0.86.0"
       ],
-      "default": "0.86.0",
-      "description": "Pi package version to install. Use 'latest' to track the newest release, or an exact version such as '0.86.0' for reproducible containers."
+      "default": "latest",
+      "description": "Pi package version to install. 'latest' is the rolling default; use an exact version such as '0.86.0' for reproducible containers."
     }
   }
 }

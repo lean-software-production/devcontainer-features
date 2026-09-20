@@ -41,8 +41,8 @@ pi --version
 ```
 
 The feature uses Pi's documented `npm install -g --ignore-scripts` installation
-form. Set `version` to `latest` to follow npm's latest release; the default is
-the exact package version `0.86.0` for reproducible builds.
+form. `version` defaults to `latest`, following npm's rolling latest release.
+Set an exact version such as `0.86.0` when reproducible builds are required.
 
 See the official [Pi quickstart](https://pi.dev/docs/latest/quickstart) and
 [provider documentation](https://pi.dev/docs/latest/providers) for current

@@ -7,9 +7,9 @@ runs after a Node Feature when both are selected. The
 installer requires `node`, `npm`, and Node.js 16 or later. The official npm
 package currently provides Linux x64 and arm64 distributions.
 
-The default is the exact `0.155.1` release of the official `@openai/codex` npm
-package for reproducible builds. Set `"version": "latest"` only when tracking
-the npm `latest` tag is intentional.
+The default tracks the rolling npm `latest` release of the official
+`@openai/codex` package. Set `"version"` to an exact release such as `0.155.1`
+when reproducible builds are required.
 
 ## First run and authentication
 

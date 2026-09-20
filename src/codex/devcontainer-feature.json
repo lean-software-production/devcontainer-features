@@ -14,8 +14,8 @@
         "latest",
         "0.155.1"
       ],
-      "default": "0.155.1",
-      "description": "Codex CLI version to install. Use an exact version for reproducible containers, or 'latest' to follow the npm latest tag."
+      "default": "latest",
+      "description": "Codex CLI version to install. 'latest' is the rolling default; use an exact version for reproducible containers."
     }
   }
 }

@@ -4,7 +4,7 @@
 set -euo pipefail
 
 PI_PACKAGE="@earendil-works/pi-coding-agent"
-PI_VERSION="${VERSION:-0.86.0}"
+PI_VERSION="${VERSION:-latest}"
 MIN_NODE_VERSION="22.19.0"
 
 version_is_at_least() {

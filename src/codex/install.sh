@@ -3,7 +3,7 @@
 # The runtime is deliberately supplied by the consuming image or Node Feature.
 set -euo pipefail
 
-CODEX_VERSION="${VERSION:-0.155.1}"
+CODEX_VERSION="${VERSION:-latest}"
 
 fail() {
     echo "ERROR: $*" >&2

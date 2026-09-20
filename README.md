@@ -28,9 +28,9 @@ See [src/fabro](src/fabro) for options and details.
 `pi`, `claude-code`, and `codex` are separate, composable Features. They do
 not install, pin, or share a Node.js runtime: select a compatible Node.js base
 image or add the official Node Feature in the consuming configuration. Each
-Feature installs only its own CLI globally, offers an exact reproducible
-`version` default plus `latest`, and leaves authentication to the remote user
-after the container is created.
+Feature installs only its own CLI globally, defaults `version` to rolling npm
+`latest`, accepts an exact version pin for reproducibility, and leaves
+authentication to the remote user after the container is created.
 
 ```jsonc
 // .devcontainer/devcontainer.json
@@ -50,9 +50,9 @@ after the container is created.
 }
 ```
 
-Use only the Features you need. Set any `version` option to `latest` when a
-non-reproducible rolling install is intentional. No credentials are embedded,
-installed, or shared between these Features.
+Use only the Features you need. The exact versions shown above are optional
+reproducibility pins; omit `version` to use the rolling `latest` default. No
+credentials are embedded, installed, or shared between these Features.
 
 | Feature | Post-create authentication | Documentation |
 | --- | --- | --- |

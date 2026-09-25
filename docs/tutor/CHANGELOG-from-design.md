@@ -50,6 +50,18 @@ Each fix again has a regression test that failed before it and passes after.
   that pointed at an archived thread. It now reads the coach thread's tabs again first: if one
   shows the fork, the side chat opened after all. Only a fork confirmed tab-less is archived; when
   the tabs can't be read, the fork is left alone and the error says so.
+- **R2 (T3): a failed swap keeps the previous files, and a crashed one is recovered.** When the
+  rollback of a failed swap couldn't put an old file back (say, a folder appeared at
+  `spec/README.md` after the old README moved aside), the error was ignored and the moved-aside
+  folder deleted, losing the previous README. The old files are now deleted only once the swap
+  finished or all of them are back; otherwise they stay in `spec/.tutor-previous/` and the error
+  names each one. The working folders now have fixed names, `spec/.tutor-adopting/` (the staged
+  lesson) and `spec/.tutor-previous/` (the old files during the swap), instead of random
+  `.tutor-staging-*` suffixes, so a crash's leftovers are found by name. Every adoption first
+  recovers them: files from `.tutor-previous/` (and from legacy `.tutor-staging-*` folders) that
+  `spec/` is missing are moved back, never overwriting one that is there, then the folders are
+  removed. A leftover that is a symbolic link is removed without being read or followed. The folders
+  sit at the top of `spec/`, never in `spec/features/`, which still holds exactly the lesson's.
 
 ## Names follow the glossary (2026-09-25)
 

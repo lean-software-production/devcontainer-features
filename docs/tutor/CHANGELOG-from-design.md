@@ -4,6 +4,36 @@ This log covers the MVP build, made while the owner was away. It records every p
 build diverges from [`DESIGN.md`](DESIGN.md) as reviewed in PR #4, and why. Entries are
 newest-first.
 
+## Codespace polish (2026-09-25)
+
+After the owner tried a real Codespace from `.devcontainer/tutor`, five changes. The feature is now
+version 0.2.0.
+
+- **All of BB wears the Tutor colours.** The plugin contributes the theme `plugin:tutor:paper`
+  (the workbook's paper, ink and blue on BB's tokens, Archivo as the UI font, a paper-coloured code
+  theme, and a dark "paper at night" variant, since BB themes need one). The feature's new `theme`
+  option selects it once per BB state directory, and only while BB's default theme is active.
+  Tutor's own rail and pages stay light paper in dark mode. The muted text colour is darkened to
+  `#56616c` so every text/surface pair reaches 4.5:1.
+- **Default BB features students don't need are off.** The feature's new `disablePlugins` option
+  switches off automations, workflows, scheduled send, Connect, keep-awake, the plugin API tools
+  and others once per id per BB state directory, so a student can turn any back on and it stays
+  on. And the plugin's sidebar navigation hides BB's Plugins and Skills rows while its
+  `simpleNavigation` setting is on (default). Tutor's navigation draws its own rows, so it has no
+  "More" overflow or per-row menus.
+- **The Claude Code, Codex and Pi CLIs are installed** in the Codespace from this repo's
+  `claude-code`, `codex` and `pi` Features, at their latest release and with no credentials.
+- **A lost connection says so.** When a Tutor call gets an answer that is not BB's (the
+  Codespaces port-forwarding proxy's empty 401 after the Codespace stopped, an HTML 502, a network
+  error), the page says the connection to the Codespace was lost, it may have stopped after being
+  idle, and offers Reload, instead of `rpc "openCoach" failed (HTTP 401)`.
+- **Keeping the Codespace awake, best effort.** GitHub does not count browser traffic through a
+  forwarded port as activity. The plugin stamps `<BB data dir>/.tutor-feature/activity` while the
+  student uses BB, and `tutor-keepalive`, run in the attach terminal by the entry point's
+  `postAttachCommand`, prints a line every 30 s while that stamp is under 120 s old, since terminal
+  output does count. Whether it works must be confirmed in a real Codespace; the reliable fix is
+  a longer idle timeout in the student's GitHub settings (up to 240 min).
+
 ## Review rounds (2026-09-25)
 
 Three Codex (gpt-6-sol) reviewers covered the backend, the feature packaging and the UI, and found
@@ -103,7 +133,7 @@ contracts. Smaller implementation choices are in `IMPLEMENTATION.md`.
 - **The rail is selected at most once per BB state directory**, and only while BB's default list
   is active. A student who switches back is never overridden.
 - **Extra feature options:** `courseRepo` (https only; empty means don't clone) and `selectRail`.
-  The feature is version 0.1.0.
+  The feature was version 0.1.0 (0.2.0 after the Codespace polish).
 
 ## Integration (2026-09-25)
 

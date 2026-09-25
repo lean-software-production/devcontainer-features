@@ -145,14 +145,29 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
   "project"`), which `confirmFactory` writes with `settings.experimental_set`. The plugin never
   creates projects. When nothing is bound, the binding is `unbound`. A stored id whose project, or
   whose local source, has gone is `missing`.
-- **The feature's `install.sh`** writes the config file as JSON `{ "course": "…", "factory": "…" }`,
-  leaving out any key whose option is empty. It also path-installs the plugin in a
+- **The feature's `install.sh`** writes the config file as JSON
+  `{ "course": "…", "factory": "…", "dataDir": "…" }`, leaving out any key whose option is empty.
+  `dataDir` is the bb Feature's BB state directory (or `$_REMOTE_USER_HOME/.bb` when that option is
+  empty), the last fallback for the heartbeat below. It also path-installs the plugin in a
   `postStartCommand` that runs after `bb-feature-autostart`, from a user-owned copy at
   `<dataDir>/.tutor-feature/plugin-<digest>` (BB rebuilds `dist/` on every path install, so the
   root-owned image copy cannot be installed directly), and skips the install when the plugin is
   already installed from that path. If BB exposes a way to select the course rail under
   Settings → Appearance → Sidebar, the feature does that too. Otherwise the first-run page tells the
   student how.
+
+- **Activity heartbeat (shared with the feature's keep-alive).** `<BB data dir>/.tutor-feature/activity`
+  (`ACTIVITY_FILE`) holds one line, an ISO-8601 UTC timestamp of the last time the student was
+  actively using BB. The plugin's `heartbeat` RPC writes it atomically, creating the directory
+  0700, at most every 30 s; the data dir is `bb.server.experimental_dataDir`, then `BB_DATA_DIR`,
+  then `dataDir` in the config file. The app-wide content script `activity` (`app/activity.ts`)
+  calls it at most every 45 s while the page is visible and the student interacted in the last
+  60 s. `/usr/local/bin/tutor-keepalive`, run by `.devcontainer/tutor`'s `postAttachCommand`,
+  treats a stamp under 120 s old as active and prints a line to its terminal every 30 s.
+- **Once per BB state directory, the feature's start-up hook** also switches off the plugins in its
+  `disablePlugins` option (recorded per id in `.tutor-feature/plugins-disabled`, so a student can
+  turn one back on) and selects the `theme` option (`plugin:tutor:paper`) while BB's default theme
+  is active (`.tutor-feature/theme-selected`).
 
 ### Student state (BACKEND implements `ProgressStore` in `server/progress/`)
 
@@ -227,7 +242,8 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
 `shared/rpc.ts` is the contract. It includes the semantics of each method, and every payload shape
 is a zod schema. The methods are `getOverview`, `getLesson`, `getCompletion`, `getThreadContext`,
 `getLexicon`, `listCandidateProjects`, `confirmFactory`, `openCoach`, `startNextHomework`,
-`startSideThread` and `redirectFocus`. Handlers fail by throwing an `Error` whose message the
+`startSideThread`, `redirectFocus` and `heartbeat` (records student activity; never an error the
+student sees). Handlers fail by throwing an `Error` whose message the
 student can read. When the course is missing, `getOverview` must still succeed, returning
 `course: null` and `courseError`. It never throws for an unbound factory.
 
@@ -246,10 +262,21 @@ not data.
 | `messageDirective` `tutor-progress` and `term` | 3A cards, and lexicon chips with pop-ups | `parseProgressCard` / `parseTermRef` (render nothing unvalidated; return the plain source when parsing fails), `getLexicon` (cache it) |
 | `threadPanelAction` `rule-tab` | 2C / 4: the Rule in focus (or the side thread's `ruleKey`), with Back to coach / Open lesson | `getThreadContext`, `getLesson` |
 | `homepageSection` `continue` | 5: Continue with your coach / Open the lesson | `getOverview` (finds the coach thread itself; `projectId` is usually null) |
+| `experimental_sidebarNavigation` `simple-nav` | BB's own navigation rows minus Plugins and Skills, activated through BB; renders BB's original while the `simpleNavigation` setting (boolean, default true) is off or loading | `useSettings` |
+| content script `activity` | none: reports activity for the keep-alive (see "Where things are") | `heartbeat` |
+
+- **Theme:** `bb.themes` contributes `paper` (`THEME_ID`; BB lists it as `plugin:tutor:paper`), a
+  light and dark mapping of the workbook palette onto BB's tokens, with Archivo inlined.
+  `themes/paper.css` is generated from `app/theme/paper.palette.css` by `npm run fonts`.
+- **Lost connection:** `useTutorRpc` turns a response that is not one of BB's JSON errors (for
+  example the Codespaces port-forwarding proxy's empty 401) or a fetch `TypeError` into
+  `ConnectionLostError` (`app/model/rpc-errors.ts`); every error surface then says the connection
+  to the Codespace was lost and offers Reload, never a raw "HTTP 401".
 
 - **CSS:** `app/paper.css` holds the fonts and tokens. Wrap plugin-owned markup in
   `.tutor-paper`. Use `.tutor-grid` for grid-paper backgrounds that may contain BB components; it
-  sets nothing that inherits. Classes are `tp-*` and tokens are `--tp-*`: BB's theme uses unprefixed
+  sets nothing that inherits. `.tutor-nav` is a third root, for the simple navigation, which uses
+  BB's tokens and no paper typography. Classes are `tp-*` and tokens are `--tp-*`: BB's theme uses unprefixed
   names such as `--ink`, and a bare token would leak into BB's own components. Never style BB's
   chat. Light mode only.
 - **Fonts:** `app/fonts/fonts.css` is generated (`npm run fonts`), because `bb plugin build` has no
@@ -265,8 +292,9 @@ not data.
   and a `CALL <tool> {json}` line makes a real tool call whose JSON matches
   `toolParameterSchemas`. Real Claude Code and Codex are never used in tests.
 - The feature's scenarios live in `test/tutor/` and follow the `test/bb/` conventions. The
-  codespace entry point is `.devcontainer/tutor/devcontainer.json`: `bb` plus `tutor`, cloning the
-  public tutorial repo at start-up.
+  codespace entry point is `.devcontainer/tutor/devcontainer.json`: `bb`, the `claude-code`,
+  `codex` and `pi` agent CLIs, and `tutor`, cloning the public tutorial repo at start-up.
+  `sync-features.sh` copies every `./features/<id>` it names from `src/<id>`.
 
 ## Stubs to replace
 

@@ -19,6 +19,11 @@ a regression test that failed before it and passes after.
   lesson isn't current, and a side chat an old coach opens is filed under that coach's lesson. The
   metadata is writable by other API clients and the thread's own agent, so this guards against
   mistakes, not a hostile agent (which has a shell in the factory anyway). The skill says so.
+- **T2: a failed tab write no longer leaves a side chat behind.** A side chat is a fork plus a tab
+  in the coach thread's right panel. When the tab write failed (say, BB's tab strip kept changing
+  the tabs), the fork stayed alive: listed in the outline, with no tab to reach it. The button and
+  `tutor_side_chat` now share `openSideChat`, which archives the fork when the tab write fails and
+  reports both errors when archiving fails too.
 
 ## Names follow the glossary (2026-09-25)
 

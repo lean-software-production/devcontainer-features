@@ -208,7 +208,9 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
   title: coachThreadTitle(id), pluginMetadata: { course, lesson, role: "coach" }, prompt })`. The
   unmanaged workspace guarantees the coach edits the folder Tutor reads, even when the project
   defaults to worktrees. Find it again with `threads.list({ originPluginId: bb.pluginId })` filtered
-  by metadata. If there are several, the newest one that isn't archived wins.
+  by metadata. If there are several, the newest one that isn't archived wins. Both that listing and
+  a coach thread's side chats read every page (`listAllThreads`: 200 rows a call, de-duplicated by
+  id) and throw a readable error past 10 000 threads rather than page forever.
 - **Side chats** (`server/coach/side-chats.ts`): what BB's built-in side-chat plugin does.
   `bb.sdk.threads.fork({ sourceThreadId: <coach>, lifecycleOwnerThreadId: <coach>, visibility:
   "hidden", title, pluginMetadata: { course, lesson, role: "sideChat", ruleKey? }, agentContextSeed:

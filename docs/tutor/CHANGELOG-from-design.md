@@ -35,6 +35,11 @@ a regression test that failed before it and passes after.
   longer before an older page arrives, so an early Rule was reported "Couldn't find" well within
   the 20 s it was meant to try. Now only the 20 s deadline and a cap of 40 scrolls to the top end
   the search; the history height is no longer read.
+- **T5: coach discovery reads every page.** Tutor listed only the newest 200 of its threads, side
+  chats included, so after a couple of hundred side chats a lesson's coach thread fell off the list
+  and "Start with your coach" spawned a duplicate. Tutor's threads and a coach thread's side chats
+  are now read page by page (`listAllThreads`, de-duplicated by id), and past 10 000 threads the
+  listing fails with a readable error instead of silently truncating.
 
 ## Names follow the glossary (2026-09-25)
 

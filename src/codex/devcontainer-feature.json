@@ -25,6 +25,11 @@
       ],
       "default": "",
       "description": "Default Codex model, written to the system config /etc/codex/config.toml. Users can still override it in ~/.codex/config.toml or with --model. Empty leaves Codex's upstream default."
+    },
+    "fullAccess": {
+      "type": "boolean",
+      "default": false,
+      "description": "Default Codex to Full Access (no sandbox, never ask for approval), written to /etc/codex/config.toml. Only suitable for disposable containers; users can still override it in ~/.codex/config.toml or with /permissions."
     }
   }
 }

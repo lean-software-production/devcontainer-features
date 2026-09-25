@@ -23,5 +23,15 @@
         "model": "gpt-6-sol"
       }
     }
+  },
+  "full_access": {
+    "image": "mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie",
+    "remoteUser": "node",
+    "features": {
+      "codex": {
+        "model": "gpt-6-sol",
+        "fullAccess": true
+      }
+    }
   }
 }

@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Runs without an image build so CI can verify rejection paths that cannot be
+# represented as successful Feature scenarios. Option validation happens before
+# the installer touches the system, and the runner has no bb Feature, so even an
+# accepted option set stops at the bb prerequisite without installing anything.
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+installer="$repo_root/src/tutor/install.sh"
+[ ! -e /usr/local/share/bb ] || { echo "refusing to run: a bb Feature is installed here, so accepted options would really install" >&2; exit 1; }
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+run_installer() { env -i PATH="$PATH" HOME="$tmp" "$@" bash "$installer" >"$tmp/out" 2>&1; }
+
+expect_reject() {
+    local label="$1" message="$2"; shift 2
+    if run_installer "$@"; then
+        echo "expected rejection: $label" >&2
+        exit 1
+    fi
+    grep -qF -- "$message" "$tmp/out" || { echo "rejected for the wrong reason: $label" >&2; cat "$tmp/out" >&2; exit 1; }
+}
+
+expect_reject 'relative course' 'course must be' COURSE=tutorial
+expect_reject 'course is the root' 'course must be' COURSE=/
+expect_reject 'shell injection in course' 'course must be' COURSE='/tmp/a;touch pwned'
+expect_reject 'quote in course' 'course must be' COURSE='/tmp/a"b'
+expect_reject 'dot traversal in course' 'course must be' COURSE=/workspaces/../etc
+# shellcheck disable=SC2016 # the literal text is the attack
+expect_reject 'command substitution in factory' 'factory must be' FACTORY='/tmp/$(id)'
+expect_reject 'relative factory' 'factory must be' FACTORY=my-factory
+expect_reject 'factory equals course' 'must be different' COURSE=/workspaces/x FACTORY=/workspaces/x/
+expect_reject 'bad selectRail' 'selectRail must be' SELECTRAIL=yes
+expect_reject 'ssh courseRepo' 'courseRepo must be' COURSEREPO=git@github.com:lean-software-production/tutorial.git
+expect_reject 'plain http courseRepo' 'courseRepo must be' COURSEREPO=http://github.com/lean-software-production/tutorial.git
+expect_reject 'option injection in courseRepo' 'courseRepo must be' COURSEREPO='--upload-pack=touch pwned'
+expect_reject 'credentials in courseRepo' 'no credentials' COURSEREPO=https://user:secret@github.com/x/y.git
+test ! -e "$tmp/pwned"
+test ! -e pwned
+
+# Valid options, including an empty courseRepo, pass validation and stop only
+# at the missing bb Feature.
+expect_reject 'defaults without the bb Feature' 'the bb Feature must be installed first'
+expect_reject 'explicit options without the bb Feature' 'the bb Feature must be installed first' \
+    COURSE=/workspaces/course/ COURSEREPO= FACTORY=/workspaces/my-factory SELECTRAIL=false
+echo 'tutor adversarial option validation passed'

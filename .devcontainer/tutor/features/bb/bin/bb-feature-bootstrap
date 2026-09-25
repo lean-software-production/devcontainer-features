@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+. /usr/local/share/bb/bin/bb-feature-common.sh
+
+bb_feature_validate_options
+[ "$BB_FEATURE_MODE" = standalone ] || exit 0
+bb_feature_prepare_data_dir
+# This sets only BB_APP_URL through bb-app's supported config API. It refreshes
+# auto-derived Codespaces origins after rebuilds without replacing provider or
+# user configuration files.
+bb_feature_apply_origin
+printf 'BB standalone state prepared at %s\n' "$BB_FEATURE_DATA_DIR"

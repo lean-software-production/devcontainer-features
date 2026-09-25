@@ -1,0 +1,51 @@
+{
+  "id": "bb",
+  "version": "1.0.0",
+  "name": "BB standalone Codespaces",
+  "description": "Installs the BB CLI and, when selected, a private loopback-only standalone BB server for one Codespace user.",
+  "documentationURL": "https://github.com/lean-software-production/devcontainer-features/tree/main/src/bb",
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/node"
+  ],
+  "options": {
+    "version": {
+      "type": "string",
+      "proposals": ["0.43.4", "latest"],
+      "default": "0.43.4",
+      "description": "bb-app version to install. Use an exact version for reproducible builds; 'latest' is explicitly allowed but resolved only while building the image."
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["cli", "standalone"],
+      "default": "cli",
+      "description": "'cli' installs BB only; 'standalone' enables the user-owned local BB server lifecycle helpers."
+    },
+    "autoStart": {
+      "type": "boolean",
+      "default": false,
+      "description": "In standalone mode, start the local BB server after each container start."
+    },
+    "serverPort": {
+      "type": "string",
+      "default": "38886",
+      "description": "Loopback-only BB web server port (1024-65535)."
+    },
+    "hostDaemonPort": {
+      "type": "string",
+      "default": "38887",
+      "description": "Loopback-only BB host-daemon helper port (1024-65535); do not forward this port."
+    },
+    "dataDir": {
+      "type": "string",
+      "default": "",
+      "description": "Absolute, user-owned BB state directory. Empty uses the remote user's ~/.bb."
+    },
+    "appUrl": {
+      "type": "string",
+      "default": "auto",
+      "description": "Browser origin for BB. 'auto' derives the private Codespaces forwarded URL, or a loopback URL outside Codespaces."
+    }
+  },
+  "postCreateCommand": "/usr/local/share/bb/bin/bb-feature-bootstrap",
+  "postStartCommand": "/usr/local/share/bb/bin/bb-feature-autostart"
+}

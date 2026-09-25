@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
+# postCreateCommand, as the remote user: clone the course if it is missing.
+# A failed clone is reported but never fails the hook: Tutor still starts and
+# shows the student why the course is missing.
+set -euo pipefail
+# shellcheck source=tutor-feature-common.sh
+. /usr/local/share/tutor/bin/tutor-feature-common.sh
+
+tutor_validate_options
+if [ -e "$TUTOR_COURSE" ] || [ -L "$TUTOR_COURSE" ]; then
+    tutor_log "course found at $TUTOR_COURSE"
+    exit 0
+fi
+if [ -z "$TUTOR_COURSE_REPO" ]; then
+    tutor_log "no course at $TUTOR_COURSE and courseRepo is empty; not cloning"
+    exit 0
+fi
+parent="$(dirname -- "$TUTOR_COURSE")"
+if [ ! -d "$parent" ] || [ ! -w "$parent" ]; then
+    tutor_log "WARNING: cannot clone the course: $parent is not a writable directory"
+    exit 0
+fi
+tutor_log "cloning $TUTOR_COURSE_REPO into $TUTOR_COURSE"
+if ! GIT_TERMINAL_PROMPT=0 git clone --quiet -- "$TUTOR_COURSE_REPO" "$TUTOR_COURSE"; then
+    tutor_log "WARNING: cloning the course failed; clone it yourself with: git clone $TUTOR_COURSE_REPO $TUTOR_COURSE"
+fi

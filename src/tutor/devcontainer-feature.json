@@ -1,0 +1,32 @@
+{
+  "id": "tutor",
+  "version": "0.1.0",
+  "name": "Tutor coached course for BB",
+  "description": "Adds the Tutor BB plugin to the bb Feature's standalone server: a course rail, lesson pages and a coach that works one Gherkin Rule at a time. Requires the bb Feature in standalone mode.",
+  "documentationURL": "https://github.com/lean-software-production/devcontainer-features/tree/main/src/tutor",
+  "options": {
+    "course": {
+      "type": "string",
+      "default": "/workspaces/tutorial",
+      "description": "Absolute path of the course checkout the plugin reads."
+    },
+    "courseRepo": {
+      "type": "string",
+      "proposals": ["https://github.com/lean-software-production/tutorial.git", ""],
+      "default": "https://github.com/lean-software-production/tutorial.git",
+      "description": "HTTPS Git URL cloned into 'course' after the container is created, if 'course' does not exist yet. Empty never clones."
+    },
+    "factory": {
+      "type": "string",
+      "default": "",
+      "description": "Optional absolute path of the student's factory repository. When it exists it is registered as a BB project, and the plugin pre-selects it."
+    },
+    "selectRail": {
+      "type": "boolean",
+      "default": true,
+      "description": "Select the Tutor course rail as BB's sidebar thread list once, unless another thread list was chosen already."
+    }
+  },
+  "postCreateCommand": "/usr/local/share/tutor/bin/tutor-feature-bootstrap",
+  "postStartCommand": "/usr/local/share/tutor/bin/tutor-feature-autostart"
+}

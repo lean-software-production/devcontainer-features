@@ -1,0 +1,41 @@
+{
+  // Codespace entry point for the Tutor course: a private, loopback-only BB
+  // with the Tutor plugin, and the public tutorial cloned next to this repo.
+  // The Features are local copies of src/bb and src/tutor; refresh them with
+  // .devcontainer/tutor/sync-features.sh (see README.md here).
+  "name": "Tutor course (BB standalone + Tutor)",
+  // Node 24 comes from the image: the bb Feature runs BB with a fixed system
+  // PATH, which sees this image's /usr/local/bin/node.
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie",
+  "features": {
+    "./features/bb": {
+      "version": "0.43.4",
+      "mode": "standalone",
+      "autoStart": true,
+      "serverPort": "38886",
+      "hostDaemonPort": "38887",
+      "dataDir": "/workspaces/.bb-state",
+      "appUrl": "auto"
+    },
+    "./features/tutor": {
+      "course": "/workspaces/tutorial",
+      "courseRepo": "https://github.com/lean-software-production/tutorial.git",
+      "factory": "/workspaces/my-factory",
+      "selectRail": true
+    }
+  },
+  // Local Features cannot use the published bb id in installsAfter, so the
+  // order is pinned here: tutor builds its plugin with bb's packaged CLI.
+  "overrideFeatureInstallOrder": ["./features/bb", "./features/tutor"],
+  "forwardPorts": [38886],
+  "portsAttributes": {
+    "38886": {
+      "label": "BB (Tutor)",
+      "protocol": "http",
+      "onAutoForward": "notify"
+    }
+  },
+  "otherPortsAttributes": {
+    "onAutoForward": "ignore"
+  }
+}

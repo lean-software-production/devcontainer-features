@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+. /usr/local/share/bb/bin/bb-feature-common.sh
+bb_feature_validate_options
+if [ "$BB_FEATURE_MODE" != standalone ]; then echo "BB Feature is in cli mode; no standalone runtime is configured."; exit 0; fi
+bb_feature_prepare_data_dir
+# Startup/plugin work can briefly delay health responses. Retry both probes
+# within a short budget, without restarting or signalling the owned launcher.
+if bb_feature_owned_launcher_alive && bb_feature_wait_ready "$BB_FEATURE_PID" 8; then
+    echo "BB standalone is ready at $(bb_feature_origin) (server ${BB_FEATURE_SERVER_PORT}, host daemon ${BB_FEATURE_DAEMON_PORT}; both loopback)."
+    exit 0
+fi
+echo "BB standalone is not ready (launcher, server health, or host daemon unavailable). Run bb-feature-autostart after enabling autoStart, or invoke the packaged launcher explicitly."
+exit 1

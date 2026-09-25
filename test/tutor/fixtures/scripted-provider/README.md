@@ -23,7 +23,8 @@ Then it reports:
   it), and
 - the skills BB offered through `skills/configure`.
 
-Two prompt lines make the bridge call a tool:
+A turn's prompt is its text blocks, each starting a line (a side chat's
+agent-only seed comes first). Two prompt lines make the bridge call a tool:
 
 - `CALL <tool> {json}` calls the tool over `item/tool/call`, but only if the
   tool was offered.

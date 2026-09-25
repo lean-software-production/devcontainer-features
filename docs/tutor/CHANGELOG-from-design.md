@@ -4,6 +4,45 @@ This log covers the MVP build, made while the owner was away. It records every p
 build diverges from [`DESIGN.md`](DESIGN.md) as reviewed in PR #4, and why. Entries are
 newest-first.
 
+## Names follow the glossary (2026-09-25)
+
+Code, docs and the feature now use the words in [`GLOSSARY.md`](GLOSSARY.md), so a name means the
+same thing to the student, the docs and the code. It is a rename only, with no new behaviour.
+Older entries below keep the names that were current when they were written.
+
+- **Start page.** The RPC payload shared by the start page, the lesson card, the Rule card and the
+  Rule tab is `LessonDetail` (`getLessonDetail`, was `Lesson` / `getLesson`). `LessonPage.tsx`
+  is `StartPage.tsx`, and the course route `lesson/NNN[/<rule>]` is `start/NNN[/<rule>]`.
+- **Homework → lesson** everywhere Tutor names it: `Lesson`, `lessonId`, `findLesson`,
+  `nextLesson`, `lessonStatus`, `BUILTIN_LESSON_ID`, `startNextLesson`, `server/course/lesson.ts`,
+  the built-in `lesson-0/`, `course.yaml`'s `lessons:` list, the card line `lesson-complete`, the
+  directive `::tutor-lesson{lesson="NNN"}` and the thread metadata key `lesson` (was
+  `iteration`). The course's own words stay: `docs/iterations/`, `spec/ITERATION`,
+  PROGRESS.yaml's `iteration` key (its format is unchanged), the `tutor_adopt_iteration` and
+  `tutor_complete_iteration` tools and their `iteration` parameters, the `homework-NNN.md` seed
+  name, the "Implement homework N" commit message from coach-me, and the course READMEs'
+  "Homework N" titles.
+- **Rail → outline:** `Outline.tsx`, `app/model/outline.ts`, `buildOutline`, the `tp-outline`
+  classes, slot `course-outline` (was `course-rail`), the feature option `selectOutline` (was
+  `selectRail`) and its `outline-selected` marker, and the test `no_clone_no_outline.sh`.
+- **Main thread → coach thread, side thread → side chat:** thread roles `coach` and `sideChat`
+  (were `main` and `side`), `coachThreadId`, `findCoachThread`, `coachThreadPrompt`,
+  `startSideChat` (was the RPC `startSideThread`). `TutorThread`'s boolean `sideChat` is now
+  `fork`. "Side thread" is kept only for the child threads spawned before side chats.
+- **Binding → factory project:** `FactoryProject` (`factoryProjectSchema`), the `factoryProject`
+  field on the overview, `server/coach/factory-project.ts`, and the statuses `unset` / `found` /
+  `missing` (were `unbound` / `bound` / `missing`). The setting was already `factoryProject`.
+- **Novelty → new/reworded:** `changeSchema` / `Change` (`new`, `reworded`, `unchanged`), the
+  `change` field, `withChanges` in `server/course/changes.ts`, and `ChangeBadge` (was `NewDot`,
+  class `tp-change-badge`).
+- **Cursor → focus** needed no code change: the code already said `focus`.
+- **Existing Codespaces need a fresh start.** There are no compatibility shims. Coach threads and
+  side chats made before this carry the old metadata (`iteration`, `role: "main"` / `"side"`), so
+  Tutor no longer lists them. Their lesson cards use the old `homework=` attribute and show as plain
+  text. Links to `lesson/NNN` open the course home. The sidebar selection names the old
+  `course-rail` slot. A `course.yaml` must say `lessons:`, and a devcontainer that sets
+  `selectRail` must set `selectOutline` instead.
+
 ## One tree (2026-09-25)
 
 After trying the MVP, the owner found the split sidebar (course rail above, conversations below)

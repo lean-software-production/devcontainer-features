@@ -2,8 +2,8 @@
 
 Status: **built** (MVP on `tutor/mvp`). [`CHANGELOG-from-design.md`](CHANGELOG-from-design.md)
 logs every change since this design was approved, newest first; the "One tree (2026-09-25)" entry
-revises the sidebar, the lesson page and side threads described in the mockups. Terms follow
-[`GLOSSARY.md`](GLOSSARY.md): to the student a homework is a *lesson*. Open
+revises the sidebar, the lesson page (now the start page) and side threads (now side chats) described
+in the mockups. Terms follow [`GLOSSARY.md`](GLOSSARY.md). Open
 [`mockups.html`](mockups.html) in a browser to see the screens this doc refers to.
 
 ## What it is
@@ -11,10 +11,10 @@ revises the sidebar, the lesson page and side threads described in the mockups. 
 A course codespace runs its own BB (see the `bb` feature). **Tutor** adds a guided course to that
 BB:
 
-- The sidebar becomes the course outline: one tree of every homework, and under each its coach
-  thread, the coach thread's Rules and its side chats. It shows which homework you are on, which
+- The sidebar becomes the course outline: one tree of every lesson, and under each its coach
+  thread, the coach thread's Rules and its side chats. It shows which lesson you are on, which
   Rule, and what has passed.
-- Each homework gets its own coach thread in the student's *factory* project, the repo where they
+- Each lesson gets its own coach thread in the student's *factory* project, the repo where they
   build their software factory. It opens in BB's own thread view, led by the lesson card. The coach
   works one Gherkin Rule at a time, and each Rule's section of the thread starts at its Rule card.
 - Progress is recorded in the student's repo, so it survives the codespace and still works if
@@ -22,7 +22,7 @@ BB:
 
 The first course is
 [`lean-software-production/tutorial`](https://github.com/lean-software-production/tutorial). Each
-homework in `docs/iterations/NNN-*/` is a cumulative spec: `README.md`, `FACTORY.md`,
+lesson in `docs/iterations/NNN-*/` is a cumulative spec: `README.md`, `FACTORY.md`,
 `features/*.feature`, and an optional seed `spec.md`. The engine itself is course-agnostic.
 
 The visual language (grid-paper page, red margin rule, Spectral / Archivo / JetBrains Mono, ✓ ● ○
@@ -35,9 +35,9 @@ outline glyphs) comes from the `workbook-tutor` branch of `software-factory-tuto
 |---|---|---|
 | 1 | **Wrap the course's `coach-me.md`, don't replace it.** Its conventions stay canonical: `spec/ITERATION`, the `spec/` snapshot, and `seeds/`. | A student can leave BB at any point and carry on with plain Claude Code or Pi. |
 | 2 | **Per-Example progress lives in the student's repo**, in `spec/PROGRESS.yaml`, committed with the work. | Portable and visible in git history. A non-BB coach can honour it after a small, additive change to `coach-me.md`. |
-| 3 | **The "you are here" unit is the Rule.** The course outline shows homework → coach thread → Rule (grouped by feature), and each Rule's Examples form its checklist. | A Rule is about the size of one coaching step. |
+| 3 | **The "you are here" unit is the Rule.** The course outline shows lesson → coach thread → Rule (grouped by feature), and each Rule's Examples form its checklist. | A Rule is about the size of one coaching step. |
 | 4 | **The coach moves the focus.** The plugin suggests an order (new or reworded Rules first, then file order), and the student can redirect with "Work on this Rule next". Clicking a Rule in the outline goes to its section of the coach thread; it never messages the coach. | Matches coach-me's "baby steps" judgement. |
-| 5 | **One coach thread per homework**, plus BB side chats of it (hidden forks, in its right panel). Side chats have full powers in the same working tree, except moving the focus. | Keeps each thread's context bounded, makes the outline read like the syllabus, and lets the student ask side questions without derailing the coach thread. |
+| 5 | **One coach thread per lesson**, plus BB side chats of it (hidden forks, in its right panel). Side chats have full powers in the same working tree, except moving the focus. | Keeps each thread's context bounded, makes the outline read like the syllabus, and lets the student ask side questions without derailing the coach thread. |
 | 6 | **Faithful paper styling, scoped to the plugin's own surfaces**, light mode only. BB-drawn chat keeps BB's styling. | BB doesn't let plugins restyle its chat, and overriding its CSS would break silently on upgrades. |
 | 7 | **The coach marks Examples, and evidence is required.** The command and its output, or a test name, are stored alongside. | The course has no step definitions, and each student chooses their own CLI shape, so a shared harness isn't possible yet. |
 | 8 | **The student's factory project is picked or confirmed, never created by the plugin.** The `bb` feature's post-create step can register it ahead of time. | Coach-me setup mode already creates the factory repo. |
@@ -50,7 +50,7 @@ UX picks from the round-2 mockups:
 | Area | Choice |
 |---|---|
 | Sidebar | **1B**, revised: one course outline tree, no separate conversations tray |
-| Lesson page | **2A**, revised: the lesson still leads the thread, as a lesson card in BB's own thread view |
+| Lesson | **2A**, revised: the lesson still leads the thread, as a lesson card in BB's own thread view |
 | Coach moments in the chat | **3A**: progress cards and lexicon terms |
 | Example states | **6B**: annotated Gherkin |
 
@@ -86,10 +86,10 @@ id: software-factory
 title: Build a software factory
 coach: .agents/coach-me.md        # per-course coaching guidance, used by the coach
 lexicon: docs/lexicon.yaml        # optional; drives ::term pop-ups
-homeworks:
+lessons:
   - { id: "001", title: Basic unvalidated loop, set: Day 1, dir: docs/iterations/001-basic-unvalidated-loop }
   - { id: "002", title: Checking the work,      set: Day 2, dir: docs/iterations/002-checking-the-work }
-  # … one entry per homework, in order
+  # … one entry per lesson, in order
 ```
 
 Each `dir` holds `README.md`, `FACTORY.md`, `features/*.feature` and an optional `spec.md`. Feature
@@ -98,12 +98,12 @@ files are parsed with `@cucumber/gherkin`. The course uses `Feature` → `Backgr
 
 The engine computes:
 
-- **New since the previous homework:** Examples keyed by `(feature file, Rule, Example)` slugs are
-  compared across homeworks, falling back to hashes of their text.
-- **Carry-over:** when a student adopts homework N+1, an Example whose text hash matches one they
+- **New or reworded since the previous lesson:** Examples keyed by `(feature file, Rule, Example)` slugs are
+  compared across lessons, falling back to hashes of their text.
+- **Carry-over:** when a student adopts lesson N+1, an Example whose text hash matches one they
   have already passed keeps its `passing` status.
 
-The engine ships its own course, **Homework 0 "Using your tutor"**. It is written in the same
+The engine ships its own course, **Lesson 0 "Using your tutor"**. It is written in the same
 format and teaches the interface by using it. For example, one Example is "When you spin off a
 side chat from a Rule, then it appears in the course outline under your lesson", and the coach checks it off like any
 other Example.
@@ -138,15 +138,15 @@ examples:
 
 **Threads**
 
-- `threads.spawn` creates one coach thread per homework in the factory project:
+- `threads.spawn` creates one coach thread per lesson in the factory project:
   - title `Coach · Lesson 003`;
-  - `pluginMetadata {course, iteration, role: "main"}`, plus `reachedRules`, the Rules the coach
+  - `pluginMetadata {course, lesson, role: "coach"}`, plus `reachedRules`, the Rules the coach
     has focused there.
 - Side chats are BB's own: `threads.fork` of the coach thread (hidden, seed-only, lifecycle owned by
-  the coach thread), with `role: "side"` and an optional `ruleKey`, plus BB's "Side chat" tab in the
+  the coach thread), with `role: "sideChat"` and an optional `ruleKey`, plus BB's "Side chat" tab in the
   coach thread's right panel. Side chats BB makes with "Reply in side chat" count too.
 - Threads are found again with `threads.list({ originPluginId, includeHidden })`, so reopening a
-  homework refocuses its existing thread. A fork is never taken for the coach thread.
+  lesson refocuses its existing thread. A fork is never taken for the coach thread.
 
 **Tools and skill**
 
@@ -155,10 +155,10 @@ BB made of a coach thread:
 
 | Tool | Does |
 |---|---|
-| `tutor_status` | Current homework, focus and Example states |
+| `tutor_status` | Current lesson, focus and Example states |
 | `tutor_focus_rule` | Moves the focus; returns the Rule card for the top of the coach's next message |
 | `tutor_mark_example` | Sets an Example's status; `evidence` is required for `passing` and a `note` for `not-yet` |
-| `tutor_adopt_iteration` | Copies the homework into `spec/`, as coach-me does |
+| `tutor_adopt_iteration` | Copies the lesson into `spec/`, as coach-me does |
 | `tutor_complete_iteration` | Sets `NNN Done` in `spec/ITERATION` |
 | `tutor_side_chat` | Moves a side question into a BB side chat |
 
@@ -176,14 +176,14 @@ authorisation. Tools re-derive everything from the repo.
 
 | Surface | BB API | Mockup |
 |---|---|---|
-| Course outline in the sidebar: every homework (count and bar), its coach thread, the coach thread's Rules by feature (greyed until reached), its side chats; then other threads | `experimental_threadList` (a takeover; BB still draws the nav and footer) | 1B, revised |
+| Course outline in the sidebar: every lesson (count and bar), its coach thread, the coach thread's Rules by feature (greyed until reached), its side chats; then other threads | `experimental_threadList` (a takeover; BB still draws the nav and footer) | 1B, revised |
 | The coach thread in BB's own thread view, opened by the lesson card; each Rule's section starts at its Rule card (annotated Gherkin with live status) | `messageDirective` (`::tutor-lesson`, `::tutor-progress` of kind `focus`) | 2A revised, 6B |
 | Side chats: BB's "Side chat" tab in the coach thread's right panel | `threads.fork`, `threads.tabs` (BB's side-chat panel) | new |
-| Start page of a homework without a coach thread: the paper lesson and "Start with your coach" | `navPanel` | 2A |
+| Start page of a lesson without a coach thread: the paper lesson and "Start with your coach" | `navPanel` | 2A |
 | An optional Rule tab in the right panel | `threadPanelAction` | 2C, 4 |
 | Progress cards and lexicon pop-ups inside chat | `messageDirective` (`::tutor-progress`, `::term`) | 3A |
 | "Continue" section on BB's home page | `homepageSection` | 5 |
-| Between homeworks: summary, confetti, `FACTORY.md` diff, "Start homework N" | `navPanel` | 7 |
+| Between lessons: summary, confetti, `FACTORY.md` diff, "Start lesson N" | `navPanel` | 7 |
 | First run: confirm the detected factory project, or the fallback picker | `navPanel` and a `project` setting | 8 |
 
 Paper CSS is scoped to plugin-owned elements. In `mockups.html`, turn on **Show BB / plugin
@@ -196,7 +196,7 @@ Each of these needs to be confirmed on SDK 0.5.9 before the plan firms up:
 1. **Sidebar takeover.** How `experimental_threadList` behaves: mobile drawer, selecting and
    pinning it in Settings, and the other-threads tray (the takeover has no "render BB's list"
    fallback).
-2. **Lesson page layout.** How `ThreadChat variant="full"` with `leadingContent` looks on a
+2. **Lesson-led thread layout.** How `ThreadChat variant="full"` with `leadingContent` looks on a
    grid-paper background inside a `navPanel` page, including scroll and composer docking.
 3. **Chat cards.** `messageDirective` rendering in coach replies.
 4. **Scoping.** Whether `configure` hides the plugin's tools and skill from threads it didn't

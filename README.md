@@ -73,7 +73,7 @@ for security, persistence, provider-login, and live acceptance boundaries.
 ## Tutor course Codespaces
 
 [`tutor`](src/tutor) adds the Tutor BB plugin to a standalone `bb` Feature: a
-course rail, lesson pages, and a coach that works one Gherkin Rule at a time.
+course outline, lesson cards, and a coach that works one Gherkin Rule at a time.
 It prebuilds the plugin at image build, clones the course (by default the
 public [tutorial](https://github.com/lean-software-production/tutorial)) after
 creation, and path-installs the plugin into BB on each start. Install `bb`

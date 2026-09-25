@@ -6,8 +6,9 @@ and it pins down every contract between them. [`DESIGN.md`](DESIGN.md) says what
 [`mockups.html`](mockups.html), round 2, with these picks: sidebar **1B** (now one course outline
 tree), lesson **2A** (now the lesson card leading the coach thread in BB's own thread view), coach
 moments **3A**, and example states **6B** (now also the Rule card). Choice buttons (3B) are not
-built. Words follow [`GLOSSARY.md`](GLOSSARY.md); code keeps some older names (`Rail.tsx`,
-`role: "main"`, `startSideThread`, `homeworkId`).
+built. Words follow [`GLOSSARY.md`](GLOSSARY.md), in the code as in the prose; the course repo's
+`docs/iterations/`, `spec/ITERATION`, PROGRESS.yaml's `iteration` key and the
+`tutor_*_iteration` tools keep the course's own word.
 
 The plugin is `src/tutor/plugin` (npm `bb-plugin-tutor`, plugin id `tutor`). It targets bb-app
 0.43.4 and pins `@get-bb/plugin-sdk` to exactly 0.5.9.
@@ -24,7 +25,7 @@ else's file.
 | `shared/**` | skeleton | Read only. The contracts. |
 | `components/`, `lib/`, `hooks/` | skeleton | Vendored BB UI (shadcn model). The frontend may *use* these, and may add new files under `components/ui/`. |
 | `README.md`, `PLUGIN_OVERVIEW.md` | skeleton | Builders can suggest changes in their report. |
-| `server/course/**` | **CONTENT** | Implements `CourseSource`. Also owns Homework 0's content. |
+| `server/course/**` | **CONTENT** | Implements `CourseSource`. Also owns Lesson 0's content. |
 | `server.ts`, `server/progress/**`, `server/coach/**`, `server/rpc/**`, `test/**` (plugin-level integration tests), `skills/tutor/SKILL.md` | **BACKEND** | Replaces the stub `server.ts`. |
 | `app.tsx`, `app/**` (including `paper.css` and `fonts/`) | **FRONTEND** | Replaces the stub `app.tsx`. Component CSS goes in `app/styles/`. |
 | `src/tutor/{devcontainer-feature.json,install.sh,bin/,README.md,NOTES.md}`, `test/tutor/**` (repo root), `.devcontainer/tutor/**`, `test/tutor/fixtures/scripted-provider/` | **FEATURE** | The feature, its tests, the codespace entry point, and the end-to-end fixture. |
@@ -70,11 +71,11 @@ The skeleton owns these, and they are all installed. Don't add any.
 
 | Module | Holds | Runtime import allowed from the frontend? |
 |---|---|---|
-| `shared/constants.ts` | Plugin, skill, tool, realtime-channel, directive, slot and setting names; env and config paths; factory and course file paths; `BUILTIN_HOMEWORK_ID`; `coachThreadTitle()` | yes |
+| `shared/constants.ts` | Plugin, skill, tool, realtime-channel, directive, slot and setting names; env and config paths; factory and course file paths; `BUILTIN_LESSON_ID`; `coachThreadTitle()` | yes |
 | `shared/keys.ts` | `slugify`, `uniqueSlugs`, `featureSlugFromPath`, `ruleKey`, `exampleKey`, `parseExampleKey`, `ruleKeyOfExample`, key patterns | yes |
-| `shared/model.ts` | zod schemas and types for Course → Homework → FeatureFile → Rule → Example → Step, LexiconEntry, IterationState, ProgressFile, ExampleProgress, StudentState, CoachThreadMetadata, and the derived enums and counts | **type only** |
-| `shared/derive.ts` | `exampleStatus`, `countExamples`, `ruleStatus`, `homeworkExamples`, `findHomework`, `nextHomework`, `findRule`, `findExample`, `resolveCurrent`, `homeworkStatus` | yes (pure; imports only types from the model) |
-| `shared/rpc.ts` | `rpcContract`, plus payload schemas and types (Overview, Lesson, Completion, Binding, TutorThread, …) and `StateChangedSignal` | **type only** |
+| `shared/model.ts` | zod schemas and types for Course → Lesson → FeatureFile → Rule → Example → Step, LexiconEntry, IterationState, ProgressFile, ExampleProgress, StudentState, CoachThreadMetadata, and the derived enums and counts | **type only** |
+| `shared/derive.ts` | `exampleStatus`, `countExamples`, `ruleStatus`, `lessonExamples`, `findLesson`, `nextLesson`, `findRule`, `findExample`, `resolveCurrent`, `lessonStatus` | yes (pure; imports only types from the model) |
+| `shared/rpc.ts` | `rpcContract`, plus payload schemas and types (Overview, LessonDetail, Completion, FactoryProject, TutorThread, …) and `StateChangedSignal` | **type only** |
 | `shared/tools.ts` | `toolParameterSchemas` for the six coach tools, and length limits | backend only |
 | `shared/directives.ts` | `parseLessonRef`, `formatLessonRef`, `parseProgressCard`, `formatProgressCard`, `parseTermRef`, `formatTermRef`, `ruleAnchor` and `RULE_ANCHOR_ATTRIBUTE` (zod-free) | yes |
 | `shared/routes.ts` | `parseRoute` and `formatRoute` for the navPanel sub-paths | yes |
@@ -103,12 +104,12 @@ The skeleton owns these, and they are all installed. Don't add any.
   Every line has its whitespace runs collapsed to one space and is then trimmed. Tags, the
   description, line numbers and Background steps are left out. So rewording a step changes the
   hash, and re-indenting or moving the Example doesn't.
-- **Novelty** compares each homework with the previous homework in course order, as documented on
-  `noveltySchema`. Everything in Homework 0 and in the first real homework is `new`.
+- **New and reworded** Examples: each lesson is compared with the previous lesson in course order, as
+  documented on `changeSchema`. Everything in Lesson 0 and in the first real lesson is `new`.
 - **`suggestedRuleOrder`:** every Rule key exactly once. Rules that are not `unchanged` come
   first, then the rest, each group in file order. Files are sorted by path.
-- **`factoryDiff`:** the FACTORY.md line diff against the previous non-builtin homework. It is
-  `null` for Homework 0 and for the first real homework.
+- **`factoryDiff`:** the FACTORY.md line diff against the previous non-builtin lesson. It is
+  `null` for Lesson 0 and for the first real lesson.
 - **`dek`:** the first prose paragraph of README.md, skipping the `#` title and any italic
   *Set after…* line.
 
@@ -118,14 +119,14 @@ The skeleton owns these, and they are all installed. Don't add any.
 imports only that file. `loadCourse(coursePath)` works as follows:
 
 1. **`course.yaml`**, when present, has the shape given in DESIGN.md: `id`, `title`, optional
-   `description`, `coach`, optional `lexicon`, and `homeworks[]` with `{ id, title, set, dir }`.
+   `description`, `coach`, optional `lexicon`, and `lessons[]` with `{ id, title, set, dir }`.
 2. **Otherwise the ledger fallback.** Parse the table in `docs/iterations/README.md`: the
    `Iteration` column is the id, the `Spec` link text is the title and its target's directory is
    `dir`, and `Set after` is `set`. Then `id` is `slugify(basename(coursePath))`, `title` is the
    course README's first `#` heading (or the id), `description` is null, `coach` is
    `.agents/coach-me.md` if it exists, and `lexicon` is `docs/lexicon.yaml` if it exists.
-3. **Homework 0** ("Using your tutor", id `000`, set `Start here`, `builtin: true`) comes first. Its
-   content lives in `server/course/builtin/`: a `course.yaml` naming `homework-0/`, which holds
+3. **Lesson 0** ("Using your tutor", id `000`, set `Start here`, `builtin: true`) comes first. Its
+   content lives in `server/course/builtin/`: a `course.yaml` naming `lesson-0/`, which holds
    `README.md`, `features/*.feature` and a short `FACTORY.md`. Find its directory from `import.meta.url`, not the working directory. Its
    Examples teach the interface, for example "When you ask a side question about the Rule in
    focus, then a side chat opens in the "Side chat" tab beside your coach thread".
@@ -143,10 +144,10 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
   `/workspaces/tutorial`.
 - **Factory hint:** the `TUTOR_FACTORY_PATH` env var, then `factory` in the config file. It is used
   only to pre-select a candidate project whose default local source path matches.
-- **Binding** is always a BB project id, stored in the `factoryProject` setting (`type:
+- **The factory project** is always a BB project id, stored in the `factoryProject` setting (`type:
   "project"`), which `confirmFactory` writes with `settings.experimental_set`. The plugin never
-  creates projects. When nothing is bound, the binding is `unbound`. A stored id whose project, or
-  whose local source, has gone is `missing`.
+  creates projects. When none is set, the factory project is `unset`; one that resolves is
+  `found`. A stored id whose project, or whose local source, has gone is `missing`.
 - **The feature's `install.sh`** writes the config file as JSON
   `{ "course": "…", "factory": "…", "dataDir": "…" }`, leaving out any key whose option is empty.
   `dataDir` is the bb Feature's BB state directory (or `$_REMOTE_USER_HOME/.bb` when that option is
@@ -174,25 +175,25 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
 ### Student state (BACKEND implements `ProgressStore` in `server/progress/`)
 
 - **`spec/ITERATION`** is one line, `NNN WIP` or `NNN Done`. It is canonical (decision 1) and is
-  never written for Homework 0.
+  never written for Lesson 0.
 - **`spec/PROGRESS.yaml`** follows `progressFileSchema`. It extends the design with four additive
   fields: `adopted` (when the iteration was adopted), `summary` (the coach's text from
   `tutor_complete_iteration`), per Example `carriedFrom`, and `history`: on adopt, the previous
-  homework's `adopted`, `summary` and Example entries (without `evidence`) are kept under its id, so
-  done homeworks' lesson and completion pages stay truthful. Write it with the ids quoted
+  lesson's `adopted`, `summary` and Example entries (without `evidence`) are kept under its id, so
+  done lessons' start and completion pages stay truthful. Write it with the ids quoted
   (`iteration: "003"`), so YAML never reads them as numbers. Keep a stable key order: `iteration`,
   `focus`, `adopted`, `summary`, `examples`, `history`. Sort `examples` by key and `history` by id.
   Write it atomically. Only the coach tools write it.
 - **Reading never throws.** Malformed content goes into `StudentState.problems`, with the part that
   couldn't be read set to null.
-- **Stale progress:** when `progress.iteration` differs from the current homework (see
-  `resolveCurrent`), treat the progress map as `{}` for that homework. Read-side views of a done
-  homework use its `history` entry instead.
-- **Current homework:** `resolveCurrent` and `homeworkStatus` in `shared/derive.ts` decide it. The
-  backend must not reimplement them. Homework 0 is under way when PROGRESS.yaml says `"000"`, and it
+- **Stale progress:** when `progress.iteration` differs from the current lesson (see
+  `resolveCurrent`), treat the progress map as `{}` for that lesson. Read-side views of a done
+  lesson use its `history` entry instead.
+- **Current lesson:** `resolveCurrent` and `lessonStatus` in `shared/derive.ts` decide it. The
+  backend must not reimplement them. Lesson 0 is under way when PROGRESS.yaml says `"000"`, and it
   is Done once all of its Examples are passing or skipped. With no state at all, the student is on
-  Homework 0 and `not-started`.
-- **Carry-over on adopt:** every Example of the new homework whose hash matches a **passing** entry
+  Lesson 0 and `not-started`.
+- **Carry-over on adopt:** every Example of the new lesson whose hash matches a **passing** entry
   in the previous PROGRESS.yaml, under any key, starts as `passing`. It keeps that entry's
   `evidence` and `at`, and gets `carriedFrom: <entry.carriedFrom ?? previous iteration>`. Every
   other Example has no entry, which means pending. The focus becomes the first entry of
@@ -202,15 +203,15 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
 
 ### Coach threads and tools (BACKEND, `server/coach/`)
 
-- **Main thread per homework:** `bb.sdk.threads.spawn({ projectId: <bound>, environment: { type:
+- **Coach thread per lesson:** `bb.sdk.threads.spawn({ projectId: <factory project>, environment: { type:
   "host", hostId: <factory source's host>, workspace: { type: "unmanaged", path: <factory root> } },
-  title: coachThreadTitle(id), pluginMetadata: { course, iteration, role: "main" }, prompt })`. The
+  title: coachThreadTitle(id), pluginMetadata: { course, lesson, role: "coach" }, prompt })`. The
   unmanaged workspace guarantees the coach edits the folder Tutor reads, even when the project
   defaults to worktrees. Find it again with `threads.list({ originPluginId: bb.pluginId })` filtered
   by metadata. If there are several, the newest one that isn't archived wins.
 - **Side chats** (`server/coach/side-chats.ts`): what BB's built-in side-chat plugin does.
-  `bb.sdk.threads.fork({ sourceThreadId: <main>, lifecycleOwnerThreadId: <main>, visibility:
-  "hidden", title, pluginMetadata: { course, iteration, role: "side", ruleKey? }, agentContextSeed:
+  `bb.sdk.threads.fork({ sourceThreadId: <coach>, lifecycleOwnerThreadId: <coach>, visibility:
+  "hidden", title, pluginMetadata: { course, lesson, role: "sideChat", ruleKey? }, agentContextSeed:
   [{ type: "text", text, mentions: [], visibility: "agent-only" }] })`, a seed-only fork that stays
   idle until the student writes in it and reuses the coach's environment. Then the tab BB writes for
   "Reply in side chat", appended with `threads.tabs.update` (retried up to 3 times on
@@ -222,42 +223,42 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
   thread are its live hidden forks (`threads.list({ sourceThreadId, includeHidden: true })`), BB's
   own included. Side threads spawned before side chats (children, `parentThreadId`) still list.
 - **A fork is never the coach thread.** A thread's role comes from its structure (`threadRole`): a
-  fork or a child is `side`, whatever its metadata says, and a hidden thread that forks nothing is
+  fork or a child is `sideChat`, whatever its metadata says, and a hidden thread that forks nothing is
   not listed.
 - **Reached Rules:** `tutor_focus_rule` adds the Rule to the coach thread's `reachedRules` metadata
   (lenient read, at most 500). The coach puts the Rule card at the top of the message that turns to
   the Rule, so these are the Rules with a section to jump to. They live on the coach thread, not in
   `PROGRESS.yaml`, because a section exists only in that thread: a new coach thread (or coaching
   outside BB) has none, and carry-over needs nothing.
-- **Metadata is untrusted.** It is fine for listing threads and filling rails. It must never be used
+- **Metadata is untrusted.** It is fine for listing threads and filling the outline. It must never be used
   to authorise anything.
 - **`configure`** is synchronous. It offers `ALL_TOOL_NAMES` and `SKILL_ID` when
   `ctx.origin.pluginId === bb.pluginId`, and to a fork whose `sourceThreadId` is a coach thread Tutor
   has seen (`server/coach/coach-registry.ts`, filled by listings and spawns, warmed at start).
 - **Every `execute()`** re-checks the calling thread with BB (`server/coach/auth.ts`,
   `coachThreadOf`): a Tutor coach thread; a hidden fork of one (Tutor's side chat, or BB's, which
-  counts as a side chat of that homework without a Rule); or a child Tutor spawned under one. It
+  counts as a side chat of that lesson without a Rule); or a child Tutor spawned under one. It
   returns `{ content: [{ type: "text", text }], isError: true }` for anything else, a visible fork
   or a fork of a side chat included. Only the coach thread itself moves the focus. Everything else
-  it needs (homework, factory root) is re-derived from the binding and the repo, never from
+  it needs (lesson, factory root) is re-derived from the factory project and the repo, never from
   metadata. Tool output stays bounded: a few KB.
 - **Tools** use the parameter schemas in `shared/tools.ts`:
 
   | Tool | Does | Returns |
   |---|---|---|
-  | `tutor_status` | Current homework, focus, and each Rule's Examples with key, status and name | Compact text the coach can act on, listing keys |
+  | `tutor_status` | Current lesson, focus, and each Rule's Examples with key, status and name | Compact text the coach can act on, listing keys |
   | `tutor_focus_rule` | Sets `focus` and records the Rule as reached. Coach thread only; side chats get `isError` | The Rule card, a `formatProgressCard({ kind: "focus", … })` line to put at the top of the next message |
   | `tutor_mark_example` | Sets one Example's status; `evidence` is required for passing and `note` for not-yet (the schema enforces this) | The matching `::tutor-progress` line: `rule-passing` when the Rule just went all-green, otherwise `example-passing` or `not-yet` |
-  | `tutor_adopt_iteration` | Only the homework after a Done one, or the first. Copies README.md, FACTORY.md and features/ into `spec/` exactly, copies `spec.md` into `seeds/` as coach-me does, writes ITERATION `NNN WIP` and a fresh PROGRESS.yaml with carry-over. Homework 0 writes only PROGRESS.yaml. **Does not commit**: the coach commits, following coach-me | Summary, and the `git show --stat` hint |
-  | `tutor_complete_iteration` | Writes ITERATION `NNN Done` and PROGRESS `summary`. Homework 0 instead requires every Example to be passing or skipped | A `homework-complete` card line |
+  | `tutor_adopt_iteration` | Only the lesson after a Done one, or the first. Copies README.md, FACTORY.md and features/ into `spec/` exactly, copies `spec.md` into `seeds/` as coach-me does, writes ITERATION `NNN WIP` and a fresh PROGRESS.yaml with carry-over. Lesson 0 writes only PROGRESS.yaml. **Does not commit**: the coach commits, following coach-me | Summary, and the `git show --stat` hint |
+  | `tutor_complete_iteration` | Writes ITERATION `NNN Done` and PROGRESS `summary`. Lesson 0 instead requires every Example to be passing or skipped | A `lesson-complete` card line |
   | `tutor_side_chat` | Forks a side chat of the coach thread, with the question as its seed, and adds its tab (see above) | The new side chat's id, and where the student finds it |
 
 - **Dispatch guard:** an `experimental_hooks` `message.dispatch` handler queues, with a reason, the
   turn of any Tutor thread (side chats included, BB's own too) whose project has another one still
   running.
-- **Prompts:** the coach thread's first prompt names the homework, tells the coach to follow the
-  `tutor` skill and carries the lesson card line (`::tutor-lesson{homework="NNN"}`) for its first
-  reply to open with. For `startNextHomework`, it also tells the coach to call
+- **Prompts:** the coach thread's first prompt names the lesson, tells the coach to follow the
+  `tutor` skill and carries the lesson card line (`::tutor-lesson{lesson="NNN"}`) for its first
+  reply to open with. For `startNextLesson`, it also tells the coach to call
   `tutor_adopt_iteration` first.
 - **The skill** (`skills/tutor/SKILL.md`) explains the BB-specific behaviour: the tools, the
   evidence rules, the lesson card and Rule cards, when to emit `::tutor-progress` and
@@ -268,14 +269,14 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
 ### RPC (BACKEND serves `server/rpc/`, FRONTEND calls)
 
 `shared/rpc.ts` is the contract. It includes the semantics of each method, and every payload shape
-is a zod schema. The methods are `getOverview`, `getLesson`, `getCompletion`, `getThreadContext`,
-`getLexicon`, `listCandidateProjects`, `confirmFactory`, `openCoach`, `startNextHomework`,
-`startSideThread` (now a BB side chat of the coach thread, returning `{ coachThreadId, sideChatId }`),
+is a zod schema. The methods are `getOverview`, `getLessonDetail`, `getCompletion`, `getThreadContext`,
+`getLexicon`, `listCandidateProjects`, `confirmFactory`, `openCoach`, `startNextLesson`,
+`startSideChat` (a BB side chat of the coach thread, returning `{ coachThreadId, sideChatId }`),
 `ensureSideChatTab` (puts a closed side chat tab back), `redirectFocus` and `heartbeat` (records
-student activity; never an error the student sees). Every homework in `getOverview` carries its
-`coachThreadId` and outline with each Rule's `reached`; `getLesson` carries `reachedRules`. Handlers fail by throwing an `Error` whose message the
+student activity; never an error the student sees). Every lesson in `getOverview` carries its
+`coachThreadId` and outline with each Rule's `reached`; `getLessonDetail` carries `reachedRules`. Handlers fail by throwing an `Error` whose message the
 student can read. When the course is missing, `getOverview` must still succeed, returning
-`course: null` and `courseError`. It never throws for an unbound factory.
+`course: null` and `courseError`. It never throws for an unset factory project.
 
 ### Realtime
 
@@ -287,10 +288,10 @@ not data.
 
 | Slot (ids in `SLOT_IDS`) | Screen | Data |
 |---|---|---|
-| `experimental_threadList` `course-rail` | The course outline (`app/model/rail.ts`, `app/ui/Rail.tsx`): brand; one tree of every homework (id, title, n/m and a thin bar, ✓ ● ○ status; the current one and the one on screen expanded); under it the coach thread row (or "Start with your coach", or a link to the start page), the coach thread's Rules grouped by feature with ✓ ! ○ ● glyphs, greyed and not clickable until reached, then its side chats (`↳`, "from: <Rule>") and "Ask a side question"; then Other threads | `getOverview` (coach thread, outline, `reached`), plus `experimental_useSidebarThreads` for live status, BB's side chats (hidden forks with `sourceThreadId`) and non-course threads. A Rule opens its section (`useOpenRule`); a side chat opens its coach thread after `ensureSideChatTab`. |
-| `navPanel` `course` at path `course` | `""` redirects to the current lesson route or to `welcome`; `lesson/NNN[/<rule>]` opens the coach thread when there is one (at the Rule's section if the route names a reached Rule; once per history entry, so Back doesn't bounce), else it is the start page (the paper lesson, 6B, and "Start with your coach", which opens the new thread); `complete/NNN` is 7; `welcome` is 8 | `getLesson`, `getCompletion`, `listCandidateProjects`, `confirmFactory`, `openCoach`, `startNextHomework` |
-| `messageDirective` `tutor-lesson`, `tutor-progress` and `term` | The lesson card (homework title, dek, tally, every Rule by feature with live status; reached Rules jump to their section); 3A progress cards, where `focus` is the Rule card (annotated Gherkin with live status, Examples collapsible, "Ask a side question", and the anchor `data-tutor-rule-anchor="<message.threadId>|<homework>/<rule>"`); lexicon chips | `parseLessonRef` / `parseProgressCard` / `parseTermRef` (render nothing unvalidated; return the plain source when parsing fails), `getLesson`, `getLexicon` (cache it) |
-| `threadPanelAction` `rule-tab` | 2C / 4, optional and never opened by Tutor itself: the Rule in focus (or the side chat's `ruleKey`), with Back to coach, Show in the conversation and Work on this Rule next | `getThreadContext`, `getLesson`, `redirectFocus` |
+| `experimental_threadList` `course-outline` | The course outline (`app/model/outline.ts`, `app/ui/Outline.tsx`): brand; one tree of every lesson (id, title, n/m and a thin bar, ✓ ● ○ status; the current one and the one on screen expanded); under it the coach thread row (or "Start with your coach", or a link to the start page), the coach thread's Rules grouped by feature with ✓ ! ○ ● glyphs, greyed and not clickable until reached, then its side chats (`↳`, "from: <Rule>") and "Ask a side question"; then Other threads | `getOverview` (coach thread, outline, `reached`), plus `experimental_useSidebarThreads` for live status, BB's side chats (hidden forks with `sourceThreadId`) and non-course threads. A Rule opens its section (`useOpenRule`); a side chat opens its coach thread after `ensureSideChatTab`. |
+| `navPanel` `course` at path `course` | `""` redirects to the current lesson route or to `welcome`; `start/NNN[/<rule>]` opens the coach thread when there is one (at the Rule's section if the route names a reached Rule; once per history entry, so Back doesn't bounce), else it is the start page (the paper lesson, 6B, and "Start with your coach", which opens the new thread); `complete/NNN` is 7; `welcome` is 8 | `getLessonDetail`, `getCompletion`, `listCandidateProjects`, `confirmFactory`, `openCoach`, `startNextLesson` |
+| `messageDirective` `tutor-lesson`, `tutor-progress` and `term` | The lesson card (lesson title, dek, tally, every Rule by feature with live status; reached Rules jump to their section); 3A progress cards, where `focus` is the Rule card (annotated Gherkin with live status, Examples collapsible, "Ask a side question", and the anchor `data-tutor-rule-anchor="<message.threadId>|<lesson>/<rule>"`); lexicon chips | `parseLessonRef` / `parseProgressCard` / `parseTermRef` (render nothing unvalidated; return the plain source when parsing fails), `getLessonDetail`, `getLexicon` (cache it) |
+| `threadPanelAction` `rule-tab` | 2C / 4, optional and never opened by Tutor itself: the Rule in focus (or the side chat's `ruleKey`), with Back to coach, Show in the conversation and Work on this Rule next | `getThreadContext`, `getLessonDetail`, `redirectFocus` |
 | `homepageSection` `continue` | 5: Continue with your coach, and the start page while there is no coach thread | `getOverview` (finds the coach thread itself; `projectId` is usually null) |
 | `experimental_sidebarNavigation` `simple-nav` | BB's own navigation rows minus Plugins and Skills, activated through BB; renders BB's original while the `simpleNavigation` setting (boolean, default true) is off or loading | `useSettings` |
 | content script `activity` | none: reports activity for the keep-alive (see "Where things are") | `heartbeat` |

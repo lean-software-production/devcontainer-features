@@ -4,6 +4,72 @@ This log covers the MVP build, made while the owner was away. It records every p
 build diverges from [`DESIGN.md`](DESIGN.md) as reviewed in PR #4, and why. Entries are
 newest-first.
 
+## Build (2026-09-25)
+
+Judgement calls the four builders made that change user-visible behaviour or the design's
+contracts. Smaller implementation choices are in `IMPLEMENTATION.md`.
+
+**Course content**
+- **Homework 0 is a built-in course** in `server/course/builtin/`, with its own `course.yaml`,
+  shown first as homework "000". It has 5 Rules and 9 Examples. It is tracked only in
+  `spec/PROGRESS.yaml`, never `spec/ITERATION`. Its evidence is the student describing what they
+  saw.
+- **A mistake in `course.yaml` fails loudly.** A named `coach` or `lexicon` file that doesn't
+  exist, or a path that leaves the course folder, stops loading with an error naming the line.
+  A course without `course.yaml` falls back to the ledger table.
+- **The lesson's dek skips boilerplate.** Sentences that repeat across a course's READMEs (for
+  example "Read `FACTORY.md`, then…") are left out.
+- **The "New since" box is generated from the data**, one line per changed feature file, instead
+  of the mockup's hand-written bullets. It is omitted when everything is new.
+
+**Coach and progress**
+- **Tools act on the homework the repo says is current.** They refuse threads Tutor didn't spawn
+  and threads outside the bound factory project. A thread's role (main or side) comes from its
+  BB-set parent, not from metadata. Only the main thread can move the focus.
+- **Adopting homeworks:** Homework 0 first; the first real homework can be adopted from Homework
+  0, so the student can skip it. After that, only the homework after a Done one.
+- **`tutor_complete_iteration` doesn't require every Example to pass** for a real homework, because
+  coach-me decides when it's done; it notes how many are open. Homework 0 does require them.
+- **Seeds are named `seeds/<slug of the seed's first heading>.md`.** coach-me hard-codes
+  `seeds/tetris.md`; the generic rule gives the same name for this course.
+- **File I/O uses `node:fs` on the BB server's machine**, not `bb.sdk.files`, because a course
+  codespace is a single machine.
+- **Opening a done homework with no coach thread spawns a "revisit" coach** that is told not to
+  change the student's progress.
+- **The collision guard holds a turn with `wait`** (backstop `sendAt` 60 s) while a sibling
+  Tutor thread in the project is running, and releases it when that thread goes idle.
+
+**UI**
+- **Clicking a Rule in the rail opens it on the lesson page.** A "Work on this Rule next" button
+  then tells the coach (decision 4's redirect), so a stray sidebar click never messages the coach.
+- **Lesson page layout:** other features are listed folded above the feature in focus, so the
+  lesson still ends at the Rule in focus. Without a stored focus, the first unfinished Rule is
+  shown as "up next". Each Example gets its own gutter/steps/margin row in the annotated Gherkin.
+- **The red margin rule runs beside the paper lesson but not beside BB's chat**, because
+  `ThreadChat` centres its own column.
+- **Additions beyond the mockups:** a "You finished homework N, see what's next" banner; a
+  status-chip row under the dek; and a progress badge on the Course nav row
+  (`experimental_sidebarAccessory`).
+- **First run says "Start the course →"**, and the nothing-found state offers "Check again" and
+  "use one of these projects anyway".
+
+**Feature and packaging**
+- **The tutor feature has no `installsAfter`.** The devcontainer CLI can't resolve the unpublished
+  `bb` feature, so compositions use `overrideFeatureInstallOrder`. Add `installsAfter` once `bb`
+  is published.
+- **The Codespace entry point commits copies of `src/bb` and `src/tutor`** under
+  `.devcontainer/tutor/features`. Symlinks fail ("Failed to fetch feature"). The copies are kept
+  current by `sync-features.sh`, which CI checks.
+- **Node comes from the `javascript-node:24` image**, not the node feature, because BB runs with a
+  fixed system `PATH` that can't see nvm's node.
+- **The feature seeds BB's plugin build toolchain at start**, so starting needs no network (BB
+  would otherwise download about 30 MB on first start).
+- **The course is registered as a BB project too**, alongside the factory.
+- **The rail is selected at most once per BB state directory**, and only while BB's default list
+  is active. A student who switches back is never overridden.
+- **Extra feature options:** `courseRepo` (https only; empty means don't clone) and `selectRail`.
+  The feature is version 0.1.0.
+
 ## Integration (2026-09-25)
 
 Proven end to end in a fresh container built from `.devcontainer/tutor` (ports moved to

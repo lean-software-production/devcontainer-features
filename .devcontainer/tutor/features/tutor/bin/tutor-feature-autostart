@@ -2,7 +2,7 @@
 # shellcheck source-path=SCRIPTDIR
 # postStartCommand, as the remote user, after bb-feature-autostart: wait for the
 # local BB, path-install the prebuilt plugin once, switch off the plugins a
-# student does not need, select the course rail and the Tutor theme, and
+# student does not need, select the course outline and the Tutor theme, and
 # register the course and factory as projects. Every step is idempotent, and
 # every choice a student can undo is made at most once per BB state directory,
 # so the hook is safe on every container start.
@@ -151,8 +151,8 @@ select_rail() {
         || { tutor_fail "cannot read the sidebar thread list setting"; return 1; }
     if [ "$current" = "$TUTOR_DEFAULT_THREAD_LIST" ]; then
         tutor_bb settings ui set sidebar.threadListProvider "$TUTOR_RAIL_THREAD_LIST" >/dev/null \
-            || { tutor_fail "cannot select the course rail"; return 1; }
-        tutor_log "selected the course rail as the sidebar thread list"
+            || { tutor_fail "cannot select the course outline"; return 1; }
+        tutor_log "selected the course outline as the sidebar thread list"
     else
         tutor_log "sidebar thread list is already '$current'; leaving it"
     fi

@@ -83,6 +83,8 @@ case "$1 $2" in
         ls -d "$BB_DATA_DIR"/plugins/toolchain-* > "$fake/toolchain-at-install"
         printf '%s' "$3" > "$fake/plugin-root"
         echo running > "$fake/plugin-status" ;;
+    "plugin reload")
+        [ -e "$fake/reload-fails" ] || echo running > "$fake/plugin-status" ;;
     "project list")
         node -e '
 const fs = require("fs");
@@ -107,7 +109,7 @@ FAKE
 chmod 755 "$fake/bin/git"
 
 reset_world() {
-    rm -rf "$state" "$course" "$factory" "$fake"/{calls.log,git.log,projects,plugin-root,plugin-status,down,install-fails,git-fails,toolchain-at-install}
+    rm -rf "$state" "$course" "$factory" "$fake"/{calls.log,git.log,projects,plugin-root,plugin-status,down,install-fails,reload-fails,git-fails,toolchain-at-install}
     mkdir -p "$state"
     printf 'thread-list/thread-list' > "$fake/rail"
     bb_options; tutor_options
@@ -149,6 +151,26 @@ expect "second start does not reinstall" bash -c "! grep -q 'plugin install' '$f
 expect "course is not registered twice" test "$(grep -cxF "$course" "$fake/projects")" = 1
 expect "factory is registered once it exists" grep -qxF "$factory" "$fake/projects"
 expect "rail decision is made only once" bash -c "! grep -q 'settings ui' '$fake/calls.log'"
+
+reset_world
+mkdir -p "$course"
+run_hook tutor-feature-autostart
+echo failed > "$fake/plugin-status"; : > "$fake/calls.log"
+run_hook tutor-feature-autostart
+expect "a failed plugin at this build's path is reloaded" calls_have "plugin reload tutor"
+expect "a reloaded plugin passes the hook" test "$rc" = 0
+expect "a failed plugin is not reinstalled" bash -c "! grep -q 'plugin install' '$fake/calls.log'"
+
+echo failed > "$fake/plugin-status"; touch "$fake/reload-fails"
+run_hook tutor-feature-autostart
+expect "a plugin that stays failed fails the hook" test "$rc" = 1
+expect "a plugin that stays failed is explained" out_has "still 'failed' after a reload"
+
+rm -f "$fake/reload-fails"; echo disabled > "$fake/plugin-status"; : > "$fake/calls.log"
+run_hook tutor-feature-autostart
+expect "a disabled plugin is left off" test "$(cat "$fake/plugin-status")" = disabled
+expect "a disabled plugin is not reloaded" bash -c "! grep -q 'plugin reload' '$fake/calls.log'"
+expect "a disabled plugin passes the hook" test "$rc" = 0
 
 reset_world
 printf '/elsewhere/tutor' > "$fake/plugin-root"; echo running > "$fake/plugin-status"

@@ -93,8 +93,20 @@ install_plugin() {
     record="$(printf '%s' "$plugins_json" | tutor_json plugin "$TUTOR_PLUGIN_ID")"
     root="${record%%$'\t'*}"
     if [ "$root" = "$TUTOR_PLUGIN_INSTALL_DIR" ]; then
-        tutor_log "plugin already installed from $root (status ${record#*$'\t'})"
-        return 0
+        status="${record#*$'\t'}"
+        case "$status" in
+            running|degraded) tutor_log "plugin already installed from $root (status $status)"; return 0 ;;
+            # The student switched it off; that is theirs to undo.
+            disabled) tutor_log "plugin is installed from $root but disabled; leaving it off"; return 0 ;;
+        esac
+        tutor_log "plugin is installed from $root but its status is '${status:-unknown}'; reloading it"
+        tutor_bb plugin reload "$TUTOR_PLUGIN_ID" >/dev/null 2>&1 || true
+        record="$(tutor_bb plugin list --json | tutor_json plugin "$TUTOR_PLUGIN_ID")"
+        status="${record#*$'\t'}"
+        case "$status" in
+            running|degraded) tutor_log "plugin reloaded (status $status)"; return 0 ;;
+            *) tutor_fail "plugin is still '${status:-unknown}' after a reload; run: bb plugin logs $TUTOR_PLUGIN_ID"; return 1 ;;
+        esac
     fi
     [ -z "$root" ] || tutor_log "plugin is installed from $root; installing this image's build instead"
     seed_toolchain

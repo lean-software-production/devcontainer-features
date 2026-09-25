@@ -70,7 +70,7 @@ references and delete `features/` and the sync script.
 `test/tutor/codespace-entry.sh` brings this configuration up with the
 devcontainer CLI, changing only what a local Docker host cannot provide like
 Codespaces does: ports 48886/48887 instead of 38886/38887, and home-directory
-paths instead of `/workspaces`. It checks the Tutor plugin, the rail, the three
+paths instead of `/workspaces`. It checks the Tutor plugin, the outline, the three
 agent CLIs (on `PATH` and reported installed by `bb updates status`), the
 switched-off plugins, the theme, and that `tutor-keepalive` returns at once
 outside Codespaces.

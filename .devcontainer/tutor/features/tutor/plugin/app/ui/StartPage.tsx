@@ -1,4 +1,4 @@
-// The route `lesson/<id>[/<rule>]`. The coach lives in BB's own thread view,
+// The route `start/<id>[/<rule>]`. The coach lives in BB's own thread view,
 // with the lesson carried into it by the lesson card and Rule cards, so a
 // lesson that has a coach thread opens it (at the Rule's section when the
 // route names one). A lesson without one shows its start page: the paper
@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { formatRoute } from "../../shared/routes.ts";
 import { refreshAll, useAction, useCourseNavigate, useOpenRule, useOverview, useQuery, useTutorRpc } from "../hooks.ts";
-import { homeworkLabel } from "../model/format.ts";
+import { lessonLabel } from "../model/format.ts";
 import { buildLesson, coachStart, foldsHiding } from "../model/lesson.ts";
 import type { CoachStart, LessonView } from "../model/lesson.ts";
 import { QUERY_KEYS } from "../state/app-state.ts";
@@ -35,37 +35,37 @@ function markRedirected(): void {
 }
 
 /** `ruleKey` is the Rule named in the URL. */
-export function LessonPage({ homeworkId, ruleKey }: { homeworkId: string; ruleKey: string | null }) {
+export function StartPage({ lessonId, ruleKey }: { lessonId: string; ruleKey: string | null }) {
   const rpc = useTutorRpc();
   const overview = useOverview();
-  const lesson = useQuery(QUERY_KEYS.lesson(homeworkId), () => rpc.call("getLesson", { homeworkId }));
-  if (lesson.data === null) {
+  const detail = useQuery(QUERY_KEYS.lessonDetail(lessonId), () => rpc.call("getLessonDetail", { lessonId }));
+  if (detail.data === null) {
     return (
       <div className="tutor-grid tp-lt">
         <div className="tutor-paper tp-lt-message">
-          {lesson.status === "error" ? <ErrorNotice message={lesson.error} /> : <Loading label="Loading the lesson…" />}
+          {detail.status === "error" ? <ErrorNotice message={detail.error} /> : <Loading label="Loading the lesson…" />}
         </div>
       </div>
     );
   }
-  if (lesson.data.coachThreadId !== null) {
-    return <ToCoach homeworkId={homeworkId} coachThreadId={lesson.data.coachThreadId} ruleKey={ruleKey} reached={lesson.data.reachedRules} />;
+  if (detail.data.coachThreadId !== null) {
+    return <ToCoach lessonId={lessonId} coachThreadId={detail.data.coachThreadId} ruleKey={ruleKey} reached={detail.data.reachedRules} />;
   }
-  const view = buildLesson(lesson.data, overview.data?.homeworks ?? [], Date.now());
+  const view = buildLesson(detail.data, overview.data?.lessons ?? [], Date.now());
   const start = coachStart(view.status, overview.data?.binding.status ?? null);
   return (
-    <StartPage key={homeworkId} view={view} start={start} urlRuleKey={ruleKey} staleError={lesson.status === "error" ? lesson.error : null} />
+    <StartPageBody key={lessonId} view={view} start={start} urlRuleKey={ruleKey} staleError={detail.status === "error" ? detail.error : null} />
   );
 }
 
 /** Opens the coach thread once per visit of this page; Back to it shows a link instead of bouncing again. */
 function ToCoach({
-  homeworkId,
+  lessonId,
   coachThreadId,
   ruleKey,
   reached,
 }: {
-  homeworkId: string;
+  lessonId: string;
   coachThreadId: string;
   ruleKey: string | null;
   reached: readonly string[];
@@ -73,9 +73,9 @@ function ToCoach({
   const navigate = useBbNavigate();
   const openRule = useOpenRule();
   const open = useCallback(() => {
-    if (ruleKey !== null && reached.includes(ruleKey)) openRule({ coachThreadId, homeworkId, ruleKey });
+    if (ruleKey !== null && reached.includes(ruleKey)) openRule({ coachThreadId, lessonId, ruleKey });
     else navigate.toThread(coachThreadId);
-  }, [coachThreadId, homeworkId, navigate, openRule, reached, ruleKey]);
+  }, [coachThreadId, lessonId, navigate, openRule, reached, ruleKey]);
   useEffect(() => {
     if (redirectedHere()) return;
     markRedirected();
@@ -85,8 +85,8 @@ function ToCoach({
   return (
     <div className="tutor-grid tp-lt">
       <div className="tutor-paper tp-lt-message">
-        <p className="tp-eyebrow">{homeworkLabel(homeworkId)}</p>
-        <p className="tp-prose">Your coach for {homeworkLabel(homeworkId).toLowerCase()} is in its thread.</p>
+        <p className="tp-eyebrow">{lessonLabel(lessonId)}</p>
+        <p className="tp-prose">Your coach for {lessonLabel(lessonId).toLowerCase()} is in its thread.</p>
         <button type="button" className="tp-btn tp-btn--big" onClick={open}>
           Open the coach thread →
         </button>
@@ -95,7 +95,7 @@ function ToCoach({
   );
 }
 
-function StartPage({
+function StartPageBody({
   view,
   start,
   urlRuleKey,
@@ -109,7 +109,7 @@ function StartPage({
   const rpc = useTutorRpc();
   const navigate = useBbNavigate();
   const goCourse = useCourseNavigate();
-  const homeworkId = view.homeworkId;
+  const lessonId = view.lessonId;
   const [openRules, setOpenRules] = useState<ReadonlySet<string>>(new Set());
   const [openFeatures, setOpenFeatures] = useState<ReadonlySet<string>>(new Set());
 
@@ -125,12 +125,12 @@ function StartPage({
   }, [urlRuleKey]);
 
   const openCoach = useAction(async () => {
-    const { threadId } = await rpc.call("openCoach", { homeworkId });
+    const { threadId } = await rpc.call("openCoach", { lessonId });
     refreshAll();
     navigate.toThread(threadId);
   });
 
-  const completeHref = coursePageHref(formatRoute({ kind: "complete", homeworkId }));
+  const completeHref = coursePageHref(formatRoute({ kind: "complete", lessonId }));
   return (
     <div className="tutor-grid tp-lt">
       <header className="tutor-paper tp-lthd">
@@ -160,10 +160,10 @@ function StartPage({
                     onClick={(event) => {
                       if (!isPlainClick(event)) return;
                       event.preventDefault();
-                      goCourse({ kind: "complete", homeworkId });
+                      goCourse({ kind: "complete", lessonId });
                     }}
                   >
-                    ✓ You finished {homeworkLabel(homeworkId).toLowerCase()}. See what's next →
+                    ✓ You finished {lessonLabel(lessonId).toLowerCase()}. See what's next →
                   </a>
                 ) : null}
               </>

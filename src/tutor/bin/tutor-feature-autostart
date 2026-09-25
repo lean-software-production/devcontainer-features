@@ -143,14 +143,14 @@ register_project() {
 
 # Decide once per BB state directory, so a student who later switches back to
 # another thread list keeps that choice. Never replace a non-default choice.
-select_rail() {
-    local marker="$TUTOR_FEATURE_RUNTIME_DIR/rail-selected" current
-    [ "$TUTOR_SELECT_RAIL" = true ] || return 0
+select_outline() {
+    local marker="$TUTOR_FEATURE_RUNTIME_DIR/outline-selected" current
+    [ "$TUTOR_SELECT_OUTLINE" = true ] || return 0
     [ ! -e "$marker" ] || return 0
     current="$(tutor_bb settings ui get sidebar.threadListProvider --json | tutor_json value)" \
         || { tutor_fail "cannot read the sidebar thread list setting"; return 1; }
     if [ "$current" = "$TUTOR_DEFAULT_THREAD_LIST" ]; then
-        tutor_bb settings ui set sidebar.threadListProvider "$TUTOR_RAIL_THREAD_LIST" >/dev/null \
+        tutor_bb settings ui set sidebar.threadListProvider "$TUTOR_OUTLINE_THREAD_LIST" >/dev/null \
             || { tutor_fail "cannot select the course outline"; return 1; }
         tutor_log "selected the course outline as the sidebar thread list"
     else
@@ -193,7 +193,7 @@ disable_plugins() {
     return "$rc"
 }
 
-# Decide once per BB state directory, like the rail: only while BB's default
+# Decide once per BB state directory, like the outline: only while BB's default
 # theme is active, and only once the Tutor plugin runs, because it contributes
 # the theme. A theme BB does not offer yet is left for a later start.
 select_theme() {
@@ -222,7 +222,7 @@ select_theme() {
 status=0
 TUTOR_PLUGIN_STATUS=
 if install_plugin; then
-    select_rail || status=1
+    select_outline || status=1
 else
     status=1
 fi

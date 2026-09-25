@@ -28,7 +28,7 @@
       "course": "/workspaces/tutorial",
       "courseRepo": "https://github.com/lean-software-production/tutorial.git",
       "factory": "/workspaces/my-factory",
-      "selectRail": true
+      "selectOutline": true
     }
   },
   // Local Features cannot use the published bb id in installsAfter, so the

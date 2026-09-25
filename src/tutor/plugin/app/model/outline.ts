@@ -1,18 +1,18 @@
 // View model of the course outline in BB's sidebar: one tree. Each lesson
-// (homework) is a top-level row; under it sit its BB threads, the coach thread
+// is a top-level row; under it sit its BB threads, the coach thread
 // and then its side chats; under the coach thread sit the lesson's Rules,
 // grouped by Feature, each leading to its section of the coach thread. Other
 // threads follow the tree. Pure, so every state is testable.
 import { withoutLeadingDirectives } from "../../shared/directives.ts";
 import { formatRoute } from "../../shared/routes.ts";
 import type { TutorRoute } from "../../shared/routes.ts";
-import type { HomeworkStatus, Novelty, RuleStatus } from "../../shared/model.ts";
-import type { FeatureOutline, HomeworkSummary, Overview, TutorThread } from "../../shared/rpc.ts";
+import type { LessonStatus, Novelty, RuleStatus } from "../../shared/model.ts";
+import type { FeatureOutline, LessonSummary, Overview, TutorThread } from "../../shared/rpc.ts";
 import { percent } from "./format.ts";
 import { indicatorView, isListed } from "./threads.ts";
 import type { IndicatorView, SidebarThreadLike } from "./threads.ts";
 
-export interface RailInput {
+export interface OutlineInput {
   overview: Overview | null;
   /** Why the overview could not be fetched (the outline still lists threads). */
   overviewError: string | null;
@@ -73,7 +73,7 @@ export interface SideRow {
 export interface LessonNode {
   id: string;
   title: string;
-  status: HomeworkStatus;
+  status: LessonStatus;
   /** "3/9" Examples hold. */
   count: string;
   percent: number;
@@ -96,15 +96,15 @@ export interface OtherThreadGroup {
   rows: ThreadRow[];
 }
 
-export type RailStatus =
+export type OutlineStatus =
   | { kind: "loading" }
   | { kind: "error"; message: string }
   | { kind: "unbound"; missing: boolean }
   | { kind: "ready" };
 
-export interface RailView {
+export interface OutlineView {
   brand: string;
-  status: RailStatus;
+  status: OutlineStatus;
   lessons: LessonNode[];
   others: OtherThreadGroup[];
 }
@@ -114,7 +114,7 @@ export function threadHref(threadId: string): string {
   return `/threads/${threadId}`;
 }
 
-function statusOf(input: RailInput): RailStatus {
+function statusOf(input: OutlineInput): OutlineStatus {
   const { overview } = input;
   if (overview === null) {
     return input.overviewError === null ? { kind: "loading" } : { kind: "error", message: input.overviewError };
@@ -157,7 +157,7 @@ function byRecent(a: SidebarThreadLike, b: SidebarThreadLike): number {
  */
 function sideRowsOf(
   coachId: string,
-  lesson: HomeworkSummary,
+  lesson: LessonSummary,
   tutorThreads: readonly TutorThread[],
   liveById: ReadonlyMap<string, SidebarThreadLike>,
   activeThreadId: string | null,
@@ -190,27 +190,27 @@ function sideRowsOf(
 }
 
 /** Which lesson is on screen: the start page's, or that of the open coach thread or side thread. */
-export function viewedHomework(
+export function viewedLesson(
   route: TutorRoute | null,
   activeThreadId: string | null,
   lessons: readonly { id: string; coachThreadId: string | null }[],
   threads: readonly Pick<SidebarThreadLike, "id" | "parentThreadId" | "sourceThreadId">[],
 ): string | null {
-  if (route !== null && (route.kind === "lesson" || route.kind === "complete")) return route.homeworkId;
+  if (route !== null && (route.kind === "start" || route.kind === "complete")) return route.lessonId;
   if (activeThreadId === null) return null;
   const active = threads.find((thread) => thread.id === activeThreadId);
   const coachId = active?.sourceThreadId ?? active?.parentThreadId ?? activeThreadId;
   return lessons.find((lesson) => lesson.coachThreadId === coachId || lesson.coachThreadId === activeThreadId)?.id ?? null;
 }
 
-export function buildRail(input: RailInput): RailView {
+export function buildOutline(input: OutlineInput): OutlineView {
   const { overview, activeThreadId } = input;
   const status = statusOf(input);
-  const summaries = overview?.course === null ? [] : (overview?.homeworks ?? []);
+  const summaries = overview?.course === null ? [] : (overview?.lessons ?? []);
   const tutorById = new Map((overview?.threads ?? []).map((thread) => [thread.id, thread]));
   const liveById = new Map(input.threads.map((thread) => [thread.id, thread]));
   const ready = status.kind === "ready";
-  const viewed = viewedHomework(input.route, activeThreadId, summaries, input.threads);
+  const viewed = viewedLesson(input.route, activeThreadId, summaries, input.threads);
 
   const row = (live: SidebarThreadLike, kind: ThreadRowKind, nested: boolean): ThreadRow => ({
     id: live.id,
@@ -251,7 +251,7 @@ export function buildRail(input: RailInput): RailView {
       canStartCoach: ready && coachId === null && lesson.status === "current",
       sideRows: coachId === null ? [] : sideRowsOf(coachId, lesson, overview?.threads ?? [], liveById, activeThreadId),
       features: coachId === null ? [] : features(lesson.outline),
-      startPath: formatRoute({ kind: "lesson", homeworkId: lesson.id }),
+      startPath: formatRoute({ kind: "start", lessonId: lesson.id }),
     };
   });
 

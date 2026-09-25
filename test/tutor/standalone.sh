@@ -24,7 +24,7 @@ let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
   process.stdout.write(p ? p.id : "");
 });' "$1"
 }
-rail() { bb settings ui get sidebar.threadListProvider --json | node -e 'let s="";process.stdin.on("data",(d)=>(s+=d)).on("end",()=>process.stdout.write(JSON.parse(s).value))'; }
+outline() { bb settings ui get sidebar.threadListProvider --json | node -e 'let s="";process.stdin.on("data",(d)=>(s+=d)).on("end",()=>process.stdout.write(JSON.parse(s).value))'; }
 # "true"/"false": whether an installed plugin is enabled.
 plugin_enabled() {
     bb plugin list --json | node -e '
@@ -34,7 +34,7 @@ let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
 });' "$1"
 }
 theme() { bb theme show --json | node -e 'let s="";process.stdin.on("data",(d)=>(s+=d)).on("end",()=>process.stdout.write(JSON.parse(s).themeId))'; }
-export -f plugin_record project_id rail plugin_enabled theme
+export -f plugin_record project_id outline plugin_enabled theme
 export state fixture
 
 # Image build: a prebuilt, root-owned plugin with runtime dependencies only.
@@ -58,7 +58,7 @@ check "plugin copy is user-owned and links the root-owned dependencies" bash -c 
 check "toolchain was seeded instead of downloaded" bash -c 'ls -d "$state"/plugins/toolchain-*/node_modules/esbuild && ! grep -q "downloading the plugin build toolchain" "$state"/logs/server*.log'
 check "course is a BB project" bash -c 'test -n "$(project_id /home/node/course)"'
 check "missing factory is not registered" bash -c 'test -z "$(project_id /home/node/my-factory)"'
-check "course rail is the sidebar thread list" bash -c 'test "$(rail)" = tutor/course-rail'
+check "course outline is the sidebar thread list" bash -c 'test "$(outline)" = tutor/course-outline'
 check "plugins students do not need are switched off" bash -c 'for id in automations connect scheduled-send keep-awake; do test "$(plugin_enabled "$id")" = false || exit 1; done'
 check "Tutor, the thread list and the providers stay on" bash -c 'for id in tutor thread-list provider-claude-code provider-codex provider-pi; do test "$(plugin_enabled "$id")" = true || exit 1; done'
 check "the Tutor theme is selected" bash -c 'test "$(theme)" = plugin:tutor:paper'
@@ -66,7 +66,7 @@ check "the Tutor theme is selected" bash -c 'test "$(theme)" = plugin:tutor:pape
 # Every start re-runs the hook: nothing is reinstalled or re-registered.
 check "autostart is idempotent" bash -c 'before=$(plugin_record tutor); out=$(tutor-feature-autostart 2>&1); test "$(plugin_record tutor)" = "$before" && grep -q "already installed" <<<"$out" && grep -q "already a BB project" <<<"$out"'
 check "factory is registered once it exists" bash -c 'git init -q /home/node/my-factory && tutor-feature-autostart && test -n "$(project_id /home/node/my-factory)"'
-check "a student's own thread list choice is kept" bash -c 'bb settings ui set sidebar.threadListProvider thread-list/thread-list >/dev/null && tutor-feature-autostart && test "$(rail)" = thread-list/thread-list'
+check "a student's own thread list choice is kept" bash -c 'bb settings ui set sidebar.threadListProvider thread-list/thread-list >/dev/null && tutor-feature-autostart && test "$(outline)" = thread-list/thread-list'
 check "a plugin the student turns back on stays on" bash -c 'bb plugin enable automations >/dev/null && tutor-feature-autostart && test "$(plugin_enabled automations)" = true'
 check "a student's own theme is kept" bash -c 'bb theme reset >/dev/null && tutor-feature-autostart && test "$(theme)" = default'
 

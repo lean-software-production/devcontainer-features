@@ -9,7 +9,7 @@ set -euo pipefail
 TUTOR_COURSE="${COURSE-/workspaces/tutorial}"
 TUTOR_COURSE_REPO="${COURSEREPO-https://github.com/lean-software-production/tutorial.git}"
 TUTOR_FACTORY="${FACTORY-}"
-TUTOR_SELECT_RAIL="${SELECTRAIL:-true}"
+TUTOR_SELECT_OUTLINE="${SELECTOUTLINE:-true}"
 TUTOR_DISABLE_PLUGINS="${DISABLEPLUGINS-automations,workflows,tasks,scheduled-send,github,browser-automation,agent-annotations,connect,plugin-api-docs,plugin-api-tester,theme-preview,keep-awake,account-pool,environment-modal-sandbox}"
 TUTOR_THEME="${THEME-plugin:tutor:paper}"
 
@@ -35,7 +35,7 @@ TUTOR_FACTORY="$(strip_trailing_slashes "$TUTOR_FACTORY")"
 valid_path "$TUTOR_COURSE" || fail "course must be an absolute path without dot segments, control characters, quotes or shell metacharacters; received '$TUTOR_COURSE'."
 [ -z "$TUTOR_FACTORY" ] || valid_path "$TUTOR_FACTORY" || fail "factory must be empty or an absolute path without dot segments, control characters, quotes or shell metacharacters; received '$TUTOR_FACTORY'."
 [ -z "$TUTOR_FACTORY" ] || [ "$TUTOR_FACTORY" != "$TUTOR_COURSE" ] || fail "factory and course must be different directories."
-case "$TUTOR_SELECT_RAIL" in true|false) ;; *) fail "selectRail must be true or false; received '$TUTOR_SELECT_RAIL'." ;; esac
+case "$TUTOR_SELECT_OUTLINE" in true|false) ;; *) fail "selectOutline must be true or false; received '$TUTOR_SELECT_OUTLINE'." ;; esac
 # The same rules as the start-up hook's tutor_plugin_list and tutor_theme_id.
 if [ -n "$TUTOR_DISABLE_PLUGINS" ]; then
     [[ "$TUTOR_DISABLE_PLUGINS" =~ ^[a-z0-9][a-z0-9-]*(,[a-z0-9][a-z0-9-]*)*$ ]] \
@@ -138,7 +138,7 @@ write_option() { printf '%s\t%s\n' "$1" "$2"; }
     write_option COURSE "$TUTOR_COURSE"
     write_option COURSE_REPO "$TUTOR_COURSE_REPO"
     write_option FACTORY "$TUTOR_FACTORY"
-    write_option SELECT_RAIL "$TUTOR_SELECT_RAIL"
+    write_option SELECT_OUTLINE "$TUTOR_SELECT_OUTLINE"
     write_option DISABLE_PLUGINS "$TUTOR_DISABLE_PLUGINS"
     write_option THEME "$TUTOR_THEME"
 } > "$SHARE_DIR/options.tsv"

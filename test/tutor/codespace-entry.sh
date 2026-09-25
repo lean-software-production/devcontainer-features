@@ -62,7 +62,7 @@ let s = \"\"; process.stdin.on(\"data\", (d) => (s += d)).on(\"end\", () => {
   const p = JSON.parse(s).plugins.find((x) => x.id === \"tutor\");
   if (!p || p.status !== \"running\") { console.error(\"tutor plugin is not running:\", p); process.exit(1); }
 });"'
-check "the course rail is selected" in_container bash -c 'bb settings ui get sidebar.threadListProvider --json | grep -q "\"tutor/course-rail\""'
+check "the course outline is selected" in_container bash -c 'bb settings ui get sidebar.threadListProvider --json | grep -q "\"tutor/course-outline\""'
 # The agent CLIs are on BB's fixed PATH, and BB's host machine finds them.
 # shellcheck disable=SC2016 # expanded in the container
 check "claude, codex and pi are in /usr/local/bin" in_container bash -c 'for cli in claude codex pi; do test -x "/usr/local/bin/$cli" || { echo "missing /usr/local/bin/$cli" >&2; exit 1; }; done'

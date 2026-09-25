@@ -16,7 +16,7 @@ TUTOR_FEATURE_OPTIONS="$TUTOR_FEATURE_SHARE/options.tsv"
     TUTOR_FEATURE_PLUGIN_DIGEST="$TUTOR_FEATURE_SHARE/plugin.sha256"
     TUTOR_PLUGIN_ID=tutor
     TUTOR_DEFAULT_THREAD_LIST=thread-list/thread-list
-    TUTOR_RAIL_THREAD_LIST=tutor/course-rail
+    TUTOR_OUTLINE_THREAD_LIST=tutor/course-outline
     TUTOR_DEFAULT_THEME=default
     # One line: the ISO-8601 UTC time a student last used BB, written by the
     # plugin. Relative to the runtime directory.
@@ -72,13 +72,13 @@ tutor_validate_options() {
     TUTOR_COURSE="$(tutor_option COURSE)"
     TUTOR_COURSE_REPO="$(tutor_option COURSE_REPO)"
     TUTOR_FACTORY="$(tutor_option FACTORY)"
-    TUTOR_SELECT_RAIL="$(tutor_option SELECT_RAIL)"
+    TUTOR_SELECT_OUTLINE="$(tutor_option SELECT_OUTLINE)"
     TUTOR_DISABLE_PLUGINS="$(tutor_option DISABLE_PLUGINS)"
     TUTOR_THEME="$(tutor_option THEME)"
     tutor_safe_path "$TUTOR_COURSE" || { tutor_fail "unsafe saved course path"; return 1; }
     [ -z "$TUTOR_FACTORY" ] || tutor_safe_path "$TUTOR_FACTORY" || { tutor_fail "unsafe saved factory path"; return 1; }
     [ -z "$TUTOR_COURSE_REPO" ] || { [[ "$TUTOR_COURSE_REPO" = https://* ]] && ! bb_feature_unsafe "$TUTOR_COURSE_REPO"; } || { tutor_fail "unsafe saved courseRepo"; return 1; }
-    case "$TUTOR_SELECT_RAIL" in true|false) ;; *) tutor_fail "invalid saved selectRail"; return 1 ;; esac
+    case "$TUTOR_SELECT_OUTLINE" in true|false) ;; *) tutor_fail "invalid saved selectOutline"; return 1 ;; esac
     tutor_plugin_list "$TUTOR_DISABLE_PLUGINS" || { tutor_fail "invalid saved disablePlugins"; return 1; }
     [ -z "$TUTOR_THEME" ] || tutor_theme_id "$TUTOR_THEME" || { tutor_fail "invalid saved theme"; return 1; }
 }

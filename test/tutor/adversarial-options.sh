@@ -31,7 +31,7 @@ expect_reject 'dot traversal in course' 'course must be' COURSE=/workspaces/../e
 expect_reject 'command substitution in factory' 'factory must be' FACTORY='/tmp/$(id)'
 expect_reject 'relative factory' 'factory must be' FACTORY=my-factory
 expect_reject 'factory equals course' 'must be different' COURSE=/workspaces/x FACTORY=/workspaces/x/
-expect_reject 'bad selectRail' 'selectRail must be' SELECTRAIL=yes
+expect_reject 'bad selectOutline' 'selectOutline must be' SELECTOUTLINE=yes
 expect_reject 'ssh courseRepo' 'courseRepo must be' COURSEREPO=git@github.com:lean-software-production/tutorial.git
 expect_reject 'plain http courseRepo' 'courseRepo must be' COURSEREPO=http://github.com/lean-software-production/tutorial.git
 expect_reject 'option injection in courseRepo' 'courseRepo must be' COURSEREPO='--upload-pack=touch pwned'
@@ -49,7 +49,7 @@ test ! -e pwned
 # at the missing bb Feature.
 expect_reject 'defaults without the bb Feature' 'the bb Feature must be installed first'
 expect_reject 'explicit options without the bb Feature' 'the bb Feature must be installed first' \
-    COURSE=/workspaces/course/ COURSEREPO= FACTORY=/workspaces/my-factory SELECTRAIL=false DISABLEPLUGINS= THEME=
+    COURSE=/workspaces/course/ COURSEREPO= FACTORY=/workspaces/my-factory SELECTOUTLINE=false DISABLEPLUGINS= THEME=
 expect_reject 'plugin list and theme without the bb Feature' 'the bb Feature must be installed first' \
     DISABLEPLUGINS=automations,tutor,provider-codex THEME=nord
 echo 'tutor adversarial option validation passed'

@@ -10,14 +10,14 @@ export const queryCache = createQueryCache();
 export const routeStore = createStore<TutorRoute | null>(null);
 
 /** Whether the course outline is the selected sidebar list (it only mounts when it is). */
-export const railMountedStore = createStore(false);
+export const outlineMountedStore = createStore(false);
 
 export const QUERY_KEYS = {
   overview: "overview",
   lexicon: "lexicon",
   candidates: "candidates",
-  lesson: (homeworkId: string) => `lesson:${homeworkId}`,
-  completion: (homeworkId: string) => `completion:${homeworkId}`,
+  lessonDetail: (lessonId: string) => `lessonDetail:${lessonId}`,
+  completion: (lessonId: string) => `completion:${lessonId}`,
   threadContext: (threadId: string) => `thread:${threadId}`,
 } as const;
 

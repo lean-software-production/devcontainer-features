@@ -84,9 +84,9 @@ order, so it follows `bb-feature-autostart`. It:
 - registers `course` and `factory` as BB projects when the directory exists
   and no project has that local source path yet (the plugin itself never
   creates projects);
-- selects the course rail with
-  `bb settings ui set sidebar.threadListProvider tutor/course-rail`, once per
-  state directory, only when the plugin is installed, `selectRail` is true,
+- selects the course outline with
+  `bb settings ui set sidebar.threadListProvider tutor/course-outline`, once per
+  state directory, only when the plugin is installed, `selectOutline` is true,
   and the current value is bb's default (`thread-list/thread-list`). A marker
   file records the decision, so a student who switches back keeps their
   choice;
@@ -111,7 +111,7 @@ order, so it follows `bb-feature-autostart`. It:
   yet, the hook logs that and tries again on the next start.
 
 The hook fails (non-zero) when BB never answers or the plugin cannot be
-installed or does not reach `running`; a project, rail, plugin or theme step
+installed or does not reach `running`; a project, outline, plugin or theme step
 that fails is reported and also makes the hook fail, after the other steps
 have run.
 
@@ -168,14 +168,14 @@ CI runs:
 - the Feature scenarios in [`test/tutor`](../../test/tutor):
   - `standalone`: prebuilt, root-owned plugin with runtime dependencies only;
     course cloned; plugin running from its digest copy; toolchain seeded, not
-    downloaded; projects and rail; idempotent restarts; the student's rail
+    downloaded; projects and outline; idempotent restarts; the student's outline
     choice kept; `config.json`'s `dataDir`; the unneeded plugins switched off
     once and a re-enabled one kept on; the Tutor theme selected once and a
     student's own theme kept; `tutor-keepalive` returning at once outside
     Codespaces; and, with the credential-free
     [scripted provider](../../test/tutor/fixtures/scripted-provider), a thread
     Tutor did not spawn is neither offered Tutor's tools nor able to run one.
-  - `no_clone_no_rail`: an empty `courseRepo`, `selectRail: false`, an empty
+  - `no_clone_no_outline`: an empty `courseRepo`, `selectOutline: false`, an empty
     `disablePlugins` and an empty `theme` in the default state directory;
 - hermetic tests of the option validation and of every hook decision against
   a fake bb CLI, including the keep-alive's freshness window and single
@@ -189,5 +189,5 @@ CI runs:
 
 A real GitHub Codespace remains the owner's acceptance step: the private
 forwarded port, `/workspaces` ownership and persistence of
-`/workspaces/.bb-state`, the rail and theme in a real browser, provider
+`/workspaces/.bb-state`, the outline and theme in a real browser, provider
 sign-in, and whether `tutor-keepalive`'s output keeps the Codespace awake.

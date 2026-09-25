@@ -15,12 +15,12 @@
         "course": "/home/node/course",
         "courseRepo": "https://github.com/lean-software-production/tutorial.git",
         "factory": "/home/node/my-factory",
-        "selectRail": true
+        "selectOutline": true
       }
     },
     "overrideFeatureInstallOrder": ["./bb", "./tutor"]
   },
-  "no_clone_no_rail": {
+  "no_clone_no_outline": {
     "image": "mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie",
     "remoteUser": "node",
     "features": {
@@ -34,7 +34,7 @@
       "tutor": {
         "course": "/home/node/absent-course",
         "courseRepo": "",
-        "selectRail": false,
+        "selectOutline": false,
         "disablePlugins": "",
         "theme": ""
       }

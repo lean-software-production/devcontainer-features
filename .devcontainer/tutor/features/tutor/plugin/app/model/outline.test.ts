@@ -2,8 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { fixtureOverview, fixtureOverviewUnbound } from "../../shared/fixtures.ts";
 import type { Overview } from "../../shared/rpc.ts";
-import { buildRail, viewedHomework } from "./rail.ts";
-import type { RailInput } from "./rail.ts";
+import { buildOutline, viewedLesson } from "./outline.ts";
+import type { OutlineInput } from "./outline.ts";
 import { indicatorTone, indicatorView } from "./threads.ts";
 import type { SidebarThreadLike } from "./threads.ts";
 
@@ -27,7 +27,7 @@ function thread(id: string, fields: Partial<SidebarThreadLike> = {}): SidebarThr
 }
 
 const liveThreads: SidebarThreadLike[] = [
-  thread("thr_coach002", { displayTitle: "Coach · Homework 002", indicator: "runtime", indicatorLabel: "Working", createdAt: 10 }),
+  thread("thr_coach002", { displayTitle: "Coach · Lesson 002", indicator: "runtime", indicatorLabel: "Working", createdAt: 10 }),
   // Tutor's side chat (in the overview's threads) and one BB's "Reply in side chat" made: hidden forks.
   thread("thr_chat002", {
     displayTitle: "Side question · validation",
@@ -50,7 +50,7 @@ const liveThreads: SidebarThreadLike[] = [
     indicatorLabel: "Unread",
     createdAt: 20,
   }),
-  thread("thr_coach001", { displayTitle: "Coach · Homework 001", createdAt: 5 }),
+  thread("thr_coach001", { displayTitle: "Coach · Lesson 001", createdAt: 5 }),
   thread("thr_readme", { displayTitle: "Add a README for the factory", updatedAt: 50 }),
   thread("thr_child", { displayTitle: "Child of README", parentThreadId: "thr_readme", updatedAt: 60 }),
   thread("thr_pi", { displayTitle: "Set up pi auth", projectId: "prj_personal", updatedAt: 90 }),
@@ -69,7 +69,7 @@ const overviewWithChat: Overview = {
     ...fixtureOverview.threads,
     {
       id: "thr_chat002",
-      homeworkId: "002",
+      lessonId: "002",
       role: "side",
       ruleKey: "validation/a-task-is-finished-when-validation-is-satisfied",
       title: "Side question · validation",
@@ -77,11 +77,11 @@ const overviewWithChat: Overview = {
       sideChat: true,
     },
     // BB's side chat as the backend lists it; the sidebar list may not carry hidden threads at all.
-    { id: "thr_bbchat002", homeworkId: "002", role: "side", ruleKey: null, title: "the outline is…", mainThreadId: "thr_coach002", sideChat: true },
+    { id: "thr_bbchat002", lessonId: "002", role: "side", ruleKey: null, title: "the outline is…", mainThreadId: "thr_coach002", sideChat: true },
   ],
 };
 
-function input(fields: Partial<RailInput> = {}): RailInput {
+function input(fields: Partial<OutlineInput> = {}): OutlineInput {
   return {
     overview: overviewWithChat,
     overviewError: null,
@@ -94,11 +94,11 @@ function input(fields: Partial<RailInput> = {}): RailInput {
 }
 
 test("one tree: every lesson, the current one open, with its coach thread, Rules and side chats", () => {
-  const rail = buildRail(input());
-  assert.equal(rail.brand, "Build a software factory");
-  assert.deepEqual(rail.status, { kind: "ready" });
+  const outline = buildOutline(input());
+  assert.equal(outline.brand, "Build a software factory");
+  assert.deepEqual(outline.status, { kind: "ready" });
   assert.deepEqual(
-    rail.lessons.map((lesson) => [lesson.id, lesson.status, lesson.count, lesson.expandedByDefault, lesson.coach?.id ?? null]),
+    outline.lessons.map((lesson) => [lesson.id, lesson.status, lesson.count, lesson.expandedByDefault, lesson.coach?.id ?? null]),
     [
       ["000", "done", "0/2", false, null],
       ["001", "done", "0/2", false, "thr_coach001"],
@@ -106,7 +106,7 @@ test("one tree: every lesson, the current one open, with its coach thread, Rules
       ["003", "ahead", "0/1", false, null],
     ],
   );
-  const current = rail.lessons.find((lesson) => lesson.id === "002");
+  const current = outline.lessons.find((lesson) => lesson.id === "002");
   assert.ok(current !== undefined);
   assert.equal(current.percent, 40);
   assert.deepEqual([current.coach?.kind, current.coach?.indicator.tone, current.canStartCoach], ["coach", "working", false]);
@@ -132,14 +132,14 @@ test("one tree: every lesson, the current one open, with its coach thread, Rules
       ["thr_chat002", "side-chat", "from: A task is finished when validation is satisfied", "/threads/thr_coach002"],
     ],
   );
-  const ahead = rail.lessons.find((lesson) => lesson.id === "003");
-  assert.deepEqual([ahead?.features, ahead?.sideRows, ahead?.canStartCoach, ahead?.startPath], [[], [], false, "lesson/003"]);
+  const ahead = outline.lessons.find((lesson) => lesson.id === "003");
+  assert.deepEqual([ahead?.features, ahead?.sideRows, ahead?.canStartCoach, ahead?.startPath], [[], [], false, "start/003"]);
 });
 
 test("other threads keep BB usable: grouped by project, newest first, children nested, hidden ones and course threads left out", () => {
-  const rail = buildRail(input());
+  const outline = buildOutline(input());
   assert.deepEqual(
-    rail.others.map((group) => [group.name, group.rows.map((row) => [row.title, row.nested])]),
+    outline.others.map((group) => [group.name, group.rows.map((row) => [row.title, row.nested])]),
     [
       ["Personal", [["Set up pi auth", false]]],
       ["my-factory", [["Add a README for the factory", false], ["Child of README", true]]],
@@ -148,66 +148,66 @@ test("other threads keep BB usable: grouped by project, newest first, children n
 });
 
 test("the lesson on screen opens too: its start page, its coach thread or a side thread", () => {
-  const onPage = buildRail(input({ route: { kind: "lesson", homeworkId: "003" } }));
+  const onPage = buildOutline(input({ route: { kind: "start", lessonId: "003" } }));
   assert.deepEqual(
     onPage.lessons.filter((lesson) => lesson.expandedByDefault).map((lesson) => lesson.id),
     ["002", "003"],
   );
-  const onCoach1 = buildRail(input({ activeThreadId: "thr_coach001" }));
+  const onCoach1 = buildOutline(input({ activeThreadId: "thr_coach001" }));
   assert.equal(onCoach1.lessons.find((lesson) => lesson.isViewed)?.id, "001");
   assert.equal(onCoach1.lessons.find((lesson) => lesson.id === "001")?.coach?.isActive, true);
-  const onSide = buildRail(input({ activeThreadId: "thr_side002" }));
+  const onSide = buildOutline(input({ activeThreadId: "thr_side002" }));
   assert.equal(onSide.lessons.find((lesson) => lesson.isViewed)?.id, "002");
   assert.equal(onSide.lessons.find((lesson) => lesson.id === "002")?.sideRows[0]?.isActive, true);
 });
 
-test("viewedHomework prefers the route, then the coach thread of the open thread", () => {
-  const lessons = fixtureOverview.homeworks;
-  assert.equal(viewedHomework({ kind: "complete", homeworkId: "001" }, "thr_coach002", lessons, liveThreads), "001");
-  assert.equal(viewedHomework({ kind: "home" }, "thr_coach001", lessons, liveThreads), "001");
-  assert.equal(viewedHomework(null, "thr_chat002", lessons, liveThreads), "002");
-  assert.equal(viewedHomework(null, "thr_readme", lessons, liveThreads), null);
-  assert.equal(viewedHomework(null, null, lessons, liveThreads), null);
+test("viewedLesson prefers the route, then the coach thread of the open thread", () => {
+  const lessons = fixtureOverview.lessons;
+  assert.equal(viewedLesson({ kind: "complete", lessonId: "001" }, "thr_coach002", lessons, liveThreads), "001");
+  assert.equal(viewedLesson({ kind: "home" }, "thr_coach001", lessons, liveThreads), "001");
+  assert.equal(viewedLesson(null, "thr_chat002", lessons, liveThreads), "002");
+  assert.equal(viewedLesson(null, "thr_readme", lessons, liveThreads), null);
+  assert.equal(viewedLesson(null, null, lessons, liveThreads), null);
 });
 
 test("no coach thread yet: the current lesson offers to start one, others link to their start page", () => {
   const overview: Overview = {
     ...fixtureOverview,
-    homeworks: fixtureOverview.homeworks.map((lesson) => ({ ...lesson, coachThreadId: null })),
+    lessons: fixtureOverview.lessons.map((lesson) => ({ ...lesson, coachThreadId: null })),
     threads: [],
   };
-  const rail = buildRail(input({ overview }));
-  const current = rail.lessons.find((lesson) => lesson.id === "002");
+  const outline = buildOutline(input({ overview }));
+  const current = outline.lessons.find((lesson) => lesson.id === "002");
   assert.deepEqual([current?.coach, current?.canStartCoach, current?.features, current?.sideRows], [null, true, [], []]);
-  assert.equal(rail.lessons.find((lesson) => lesson.id === "001")?.canStartCoach, false);
-  assert.equal(rail.others.flatMap((group) => group.rows).length, 6, "former Tutor threads fall back to Other threads");
+  assert.equal(outline.lessons.find((lesson) => lesson.id === "001")?.canStartCoach, false);
+  assert.equal(outline.others.flatMap((group) => group.rows).length, 6, "former Tutor threads fall back to Other threads");
 });
 
 test("a coach thread the sidebar has not listed yet still gets a row", () => {
-  const rail = buildRail(input({ threads: [] }));
-  const coach = rail.lessons.find((lesson) => lesson.id === "002")?.coach;
+  const outline = buildOutline(input({ threads: [] }));
+  const coach = outline.lessons.find((lesson) => lesson.id === "002")?.coach;
   assert.deepEqual([coach?.href, coach?.indicator.tone], ["/threads/thr_coach002", "none"]);
 });
 
 test("unbound, loading and failed states still list other threads", () => {
-  const unbound = buildRail(input({ overview: fixtureOverviewUnbound }));
+  const unbound = buildOutline(input({ overview: fixtureOverviewUnbound }));
   assert.deepEqual(unbound.status, { kind: "unbound", missing: false });
   assert.equal(unbound.lessons.length, 4);
   assert.ok(unbound.lessons.every((lesson) => lesson.coach === null && !lesson.canStartCoach && !lesson.expandedByDefault));
   assert.ok(unbound.others.length > 0);
 
-  const missing = buildRail(input({ overview: { ...fixtureOverviewUnbound, binding: { status: "missing", projectId: "prj_gone" } } }));
+  const missing = buildOutline(input({ overview: { ...fixtureOverviewUnbound, binding: { status: "missing", projectId: "prj_gone" } } }));
   assert.deepEqual(missing.status, { kind: "unbound", missing: true });
 
-  const loading = buildRail(input({ overview: null }));
+  const loading = buildOutline(input({ overview: null }));
   assert.deepEqual(loading.status, { kind: "loading" });
   assert.equal(loading.brand, "Tutor");
   assert.equal(loading.others.flatMap((group) => group.rows).length, 6);
 
-  const failed = buildRail(input({ overview: null, overviewError: "Tutor's backend is not running." }));
+  const failed = buildOutline(input({ overview: null, overviewError: "Tutor's backend is not running." }));
   assert.deepEqual(failed.status, { kind: "error", message: "Tutor's backend is not running." });
 
-  const noCourse = buildRail(
+  const noCourse = buildOutline(
     input({ overview: { ...fixtureOverviewUnbound, course: null, courseError: "No course at /workspaces/tutorial." } }),
   );
   assert.deepEqual(noCourse.status, { kind: "error", message: "No course at /workspaces/tutorial." });

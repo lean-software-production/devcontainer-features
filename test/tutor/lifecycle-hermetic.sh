@@ -60,7 +60,7 @@ bb_options() {
 default_disable=automations,workflows,tasks,github
 tutor_options() {
     set_options "$tutor_share/options.tsv" COURSE "$course" COURSE_REPO "${1-https://example.invalid/course.git}" \
-        FACTORY "$factory" SELECT_RAIL "${2:-true}" DISABLE_PLUGINS "${3-$default_disable}" THEME "${4-plugin:tutor:paper}"
+        FACTORY "$factory" SELECT_OUTLINE "${2:-true}" DISABLE_PLUGINS "${3-$default_disable}" THEME "${4-plugin:tutor:paper}"
 }
 
 printf '#!/bin/sh\nexit 0\n' > "$bb_share/npm/bin/bb-app"
@@ -120,8 +120,8 @@ console.log(JSON.stringify(paths.map((path, i) => ({ id: `proj_${i}`, sources: [
     "project create") printf '%s\n' "$6" >> "$fake/projects" ;;
     "settings ui")
         case "$3" in
-            get) printf '{"key":"%s","revision":0,"value":"%s"}\n' "$4" "$(cat "$fake/rail")" ;;
-            set) printf '%s' "$5" > "$fake/rail" ;;
+            get) printf '{"key":"%s","revision":0,"value":"%s"}\n' "$4" "$(cat "$fake/outline")" ;;
+            set) printf '%s' "$5" > "$fake/outline" ;;
         esac ;;
     *) echo "fake bb: unexpected $*" >&2; exit 2 ;;
 esac
@@ -138,7 +138,7 @@ chmod 755 "$fake/bin/git"
 reset_world() {
     rm -rf "$state" "$course" "$factory" "$fake"/{calls.log,git.log,projects,plugin-root,plugin-status,down,install-fails,reload-fails,git-fails,toolchain-at-install,disable-fails}
     mkdir -p "$state"
-    printf 'thread-list/thread-list' > "$fake/rail"
+    printf 'thread-list/thread-list' > "$fake/outline"
     printf '%s\n' "automations running" "workflows disabled" "github running" "thread-list running" \
         "provider-codex running" "environment-git-worktree running" "keep-awake running" > "$fake/plugins"
     printf 'default' > "$fake/theme"
@@ -175,7 +175,7 @@ expect "bb gets the bb Feature's server, state and daemon, and nothing else" \
     test "$(cat "$fake/env.log")" = "http://127.0.0.1:48886|$state|48887|"
 expect "course is registered" grep -qxF "$course" "$fake/projects"
 expect "missing factory is skipped" out_has "no factory at $factory yet"
-expect "course rail is selected" test "$(cat "$fake/rail")" = tutor/course-rail
+expect "course outline is selected" test "$(cat "$fake/outline")" = tutor/course-outline
 
 : > "$fake/calls.log"
 mkdir -p "$factory"
@@ -184,7 +184,7 @@ expect "second start succeeds" test "$rc" = 0
 expect "second start does not reinstall" bash -c "! grep -q 'plugin install' '$fake/calls.log'"
 expect "course is not registered twice" test "$(grep -cxF "$course" "$fake/projects")" = 1
 expect "factory is registered once it exists" grep -qxF "$factory" "$fake/projects"
-expect "rail decision is made only once" bash -c "! grep -q 'settings ui' '$fake/calls.log'"
+expect "outline decision is made only once" bash -c "! grep -q 'settings ui' '$fake/calls.log'"
 
 reset_world
 mkdir -p "$course"
@@ -214,15 +214,15 @@ expect "a plugin installed from elsewhere is replaced" test "$(cat "$fake/plugin
 expect "copies of other builds are removed" test ! -e "$state/.tutor-feature/plugin-ffffffffffffffff"
 
 reset_world
-printf 'someone/else' > "$fake/rail"
+printf 'someone/else' > "$fake/outline"
 run_hook tutor-feature-autostart
-expect "another thread list choice is kept" test "$(cat "$fake/rail")" = someone/else
+expect "another thread list choice is kept" test "$(cat "$fake/outline")" = someone/else
 expect "the kept choice is logged" out_has "already 'someone/else'"
 
 reset_world
 tutor_options https://example.invalid/course.git false
 run_hook tutor-feature-autostart
-expect "selectRail false never touches the setting" bash -c "! grep -q 'settings ui' '$fake/calls.log'"
+expect "selectOutline false never touches the setting" bash -c "! grep -q 'settings ui' '$fake/calls.log'"
 
 reset_world
 mkdir -p "$course"
@@ -230,7 +230,7 @@ touch "$fake/install-fails"
 run_hook tutor-feature-autostart
 expect "a failed install fails the hook" test "$rc" = 1
 expect "a failed install is explained" out_has "bb plugin install failed: install failed: boom"
-expect "no rail is selected without the plugin" test "$(cat "$fake/rail")" = thread-list/thread-list
+expect "no outline is selected without the plugin" test "$(cat "$fake/outline")" = thread-list/thread-list
 expect "projects are still registered" grep -qxF "$course" "$fake/projects"
 
 reset_world
@@ -444,7 +444,7 @@ expect "a failed clone does not fail the hook" test "$rc" = 0
 expect "a failed clone says how to recover" out_has "clone it yourself with: git clone https://example.invalid/course.git $course"
 
 reset_world
-set_options "$tutor_share/options.tsv" COURSE "/nonexistent-parent-$$/course" COURSE_REPO https://example.invalid/course.git FACTORY "" SELECT_RAIL true \
+set_options "$tutor_share/options.tsv" COURSE "/nonexistent-parent-$$/course" COURSE_REPO https://example.invalid/course.git FACTORY "" SELECT_OUTLINE true \
     DISABLE_PLUGINS "" THEME ""
 run_hook tutor-feature-bootstrap
 expect "an unwritable parent is reported, not fatal" test "$rc" = 0

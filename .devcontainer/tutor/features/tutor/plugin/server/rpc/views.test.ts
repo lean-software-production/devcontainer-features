@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { findHomework, homeworkExamples } from "../../shared/derive.ts";
+import { findLesson, lessonExamples } from "../../shared/derive.ts";
 import {
   fixtureCompletion,
   fixtureCourse,
   fixtureFreshStudent,
-  fixtureLesson,
+  fixtureLessonDetail,
   fixtureOverview,
   fixtureOverviewUnbound,
   fixtureReachedRules,
@@ -13,10 +13,10 @@ import {
   fixtureThreads,
 } from "../../shared/fixtures.ts";
 import type { StudentState } from "../../shared/model.ts";
-import { completionSchema, lessonSchema, overviewSchema } from "../../shared/rpc.ts";
+import { completionSchema, lessonDetailSchema, overviewSchema } from "../../shared/rpc.ts";
 import { makeWorld } from "../../test/helpers/world.ts";
 import type { TutorThreadRecord } from "../coach/threads.ts";
-import { buildCompletion, buildLesson, buildOverview } from "./views.ts";
+import { buildCompletion, buildLessonDetail, buildOverview } from "./views.ts";
 
 const records: TutorThreadRecord[] = fixtureThreads.map((thread, index) => ({
   ...thread,
@@ -32,7 +32,7 @@ test("the overview matches the fixture the frontend was built against", () => {
   assert.deepEqual(overview, fixtureOverview);
 });
 
-test("unbound: homeworks are listed from a fresh start, with no current state or threads", () => {
+test("unbound: lessons are listed from a fresh start, with no current state or threads", () => {
   assert.deepEqual(buildOverview(makeWorld(fixtureStudent, { status: "unbound" }), records), fixtureOverviewUnbound);
 });
 
@@ -40,21 +40,21 @@ test("a missing course still gives an overview", () => {
   const overview = buildOverview({ ...makeWorld(), course: null, pointer: null, courseError: "No course at /x." }, records);
   assert.equal(overview.course, null);
   assert.equal(overview.courseError, "No course at /x.");
-  assert.deepEqual(overview.homeworks, []);
+  assert.deepEqual(overview.lessons, []);
 });
 
 test("the current lesson carries progress, focus and its coach thread", () => {
-  const lesson = buildLesson(makeWorld(), "002", records);
-  assert.deepEqual(lessonSchema.parse(lesson), lesson);
-  assert.deepEqual(lesson, fixtureLesson);
-  const ahead = buildLesson(makeWorld(), "003", records);
+  const detail = buildLessonDetail(makeWorld(), "002", records);
+  assert.deepEqual(lessonDetailSchema.parse(detail), detail);
+  assert.deepEqual(detail, fixtureLessonDetail);
+  const ahead = buildLessonDetail(makeWorld(), "003", records);
   assert.equal(ahead.status, "ahead");
   assert.deepEqual(ahead.progress, {});
   assert.equal(ahead.iterationStatus, null);
-  assert.throws(() => buildLesson(makeWorld(), "009", records), /no lesson 009/);
+  assert.throws(() => buildLessonDetail(makeWorld(), "009", records), /no lesson 009/);
 });
 
-test("completion describes the finished homework and what comes next", () => {
+test("completion describes the finished lesson and what comes next", () => {
   const progress = fixtureStudent.progress;
   assert.ok(progress !== null);
   const done: StudentState = {
@@ -72,12 +72,12 @@ test("completion describes the finished homework and what comes next", () => {
   assert.throws(() => buildCompletion(makeWorld(fixtureFreshStudent), "002", records), /not complete/);
 });
 
-test("a past homework's completion counts carry-over from what was passing in that homework", () => {
-  const one = findHomework(fixtureCourse, "001");
-  const two = findHomework(fixtureCourse, "002");
+test("a past lesson's completion counts carry-over from what was passing in that lesson", () => {
+  const one = findLesson(fixtureCourse, "001");
+  const two = findLesson(fixtureCourse, "002");
   assert.ok(one !== undefined && two !== undefined);
-  const passedInOne = new Set(homeworkExamples(one).map((example) => example.hash));
-  const expected = homeworkExamples(two).filter((example) => passedInOne.has(example.hash)).length;
+  const passedInOne = new Set(lessonExamples(one).map((example) => example.hash));
+  const expected = lessonExamples(two).filter((example) => passedInOne.has(example.hash)).length;
   assert.ok(expected > 0, "the fixture carries something from 001 into 002");
   const student: StudentState = {
     iteration: { iteration: "003", status: "WIP" },
@@ -88,7 +88,7 @@ test("a past homework's completion counts carry-over from what was passing in th
         "000": { examples: {} },
         "001": {
           examples: Object.fromEntries(
-            homeworkExamples(one).map((example) => [example.key, { status: "passing", hash: example.hash, at: "2026-09-23T10:00:00Z" }]),
+            lessonExamples(one).map((example) => [example.key, { status: "passing", hash: example.hash, at: "2026-09-23T10:00:00Z" }]),
           ),
         },
         "002": { examples: {} },

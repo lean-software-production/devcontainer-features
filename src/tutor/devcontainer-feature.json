@@ -21,7 +21,7 @@
       "default": "",
       "description": "Optional absolute path of the student's factory repository. When it exists it is registered as a BB project, and the plugin pre-selects it."
     },
-    "selectRail": {
+    "selectOutline": {
       "type": "boolean",
       "default": true,
       "description": "Select the Tutor course outline as BB's sidebar thread list once, unless another thread list was chosen already."

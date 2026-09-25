@@ -17,17 +17,17 @@ export function RuleTab({ threadId, params }: PluginThreadPanelProps) {
   const rpc = useTutorRpc();
   const navigate = useBbNavigate();
   const openRule = useOpenRule();
-  const redirect = useAction(async (homeworkId: string, ruleKey: string) => {
-    await rpc.call("redirectFocus", { homeworkId, ruleKey });
+  const redirect = useAction(async (lessonId: string, ruleKey: string) => {
+    await rpc.call("redirectFocus", { lessonId, ruleKey });
     toast.success("Asked your coach to move to this Rule.");
   });
   const context = useQuery(QUERY_KEYS.threadContext(threadId), () => rpc.call("getThreadContext", { threadId }));
   const thread = context.data?.thread ?? null;
   const target = context.data === null ? null : ruleTabTarget(parseRuleTabParams(params), thread);
-  const homeworkId = target?.homeworkId ?? null;
-  // The fetcher only runs for a non-null key, so homeworkId is set whenever it is called.
-  const lesson = useQuery(homeworkId === null ? null : QUERY_KEYS.lesson(homeworkId), () =>
-    rpc.call("getLesson", { homeworkId: homeworkId ?? "" }),
+  const lessonId = target?.lessonId ?? null;
+  // The fetcher only runs for a non-null key, so lessonId is set whenever it is called.
+  const detail = useQuery(lessonId === null ? null : QUERY_KEYS.lessonDetail(lessonId), () =>
+    rpc.call("getLessonDetail", { lessonId: lessonId ?? "" }),
   );
 
   const body = () => {
@@ -41,17 +41,17 @@ export function RuleTab({ threadId, params }: PluginThreadPanelProps) {
         </p>
       );
     }
-    if (lesson.data === null) {
-      return lesson.status === "error" ? <ErrorNotice message={lesson.error} /> : <Loading label="Loading the Rule…" />;
+    if (detail.data === null) {
+      return detail.status === "error" ? <ErrorNotice message={detail.error} /> : <Loading label="Loading the Rule…" />;
     }
-    const view = ruleTabView(lesson.data, target, thread?.role === "side");
-    const coachThreadId = lesson.data.coachThreadId;
+    const view = ruleTabView(detail.data, target, thread?.role === "side");
+    const coachThreadId = detail.data.coachThreadId;
     if (view.kind === "no-rule") {
       return <p className="tp-yah-note">No Rule is in focus yet. Your coach picks one when you start.</p>;
     }
-    const ruleKey = target.ruleKey ?? lesson.data.focus;
-    const reached = ruleKey !== null && lesson.data.reachedRules.includes(ruleKey);
-    const canRedirect = lesson.data.status === "current" && ruleKey !== null && ruleKey !== lesson.data.focus;
+    const ruleKey = target.ruleKey ?? detail.data.focus;
+    const reached = ruleKey !== null && detail.data.reachedRules.includes(ruleKey);
+    const canRedirect = detail.data.status === "current" && ruleKey !== null && ruleKey !== detail.data.focus;
     return (
       <>
         <p className="tp-eyebrow">{view.eyebrow}</p>
@@ -85,12 +85,12 @@ export function RuleTab({ threadId, params }: PluginThreadPanelProps) {
             </button>
           ) : null}
           {reached && coachThreadId !== null && ruleKey !== null ? (
-            <button type="button" className="tp-pri" onClick={() => openRule({ coachThreadId, homeworkId: target.homeworkId, ruleKey })}>
+            <button type="button" className="tp-pri" onClick={() => openRule({ coachThreadId, lessonId: target.lessonId, ruleKey })}>
               Show in the conversation
             </button>
           ) : null}
           {canRedirect ? (
-            <button type="button" disabled={redirect.pending} onClick={() => void redirect.run(target.homeworkId, ruleKey)}>
+            <button type="button" disabled={redirect.pending} onClick={() => void redirect.run(target.lessonId, ruleKey)}>
               Work on this Rule next
             </button>
           ) : null}

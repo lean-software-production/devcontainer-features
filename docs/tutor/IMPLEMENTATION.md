@@ -221,8 +221,10 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
   paramsJson) + ":none", kind: "plugin-panel", pluginId: "side-chat", actionId: "side-chat", title:
   "Side chat", paramsJson: { threadId, sourceThreadId, sourceMessageText, sourceSeqEnd: null } }`.
   Both the button (`startSideChat`) and `tutor_side_chat` go through `openSideChat`: if the tab
-  write fails, the fork is archived before the error surfaces, and if archiving fails too the error
-  names both. A plugin cannot select another plugin's tab, so the frontend points to it with a
+  write fails, it reads the coach thread's tabs again, because BB may have stored the write despite
+  the error, or another client may have written the same tab. A tab showing the fork means success.
+  Only a fork confirmed tab-less is archived before the error surfaces; if archiving fails too the
+  error names both, and if the tabs can't be read the fork is left alone. A plugin cannot select another plugin's tab, so the frontend points to it with a
   toast. A provider that cannot fork gets a readable error; there is no fallback. The side chats of a coach
   thread are its live hidden forks (`threads.list({ sourceThreadId, includeHidden: true })`), BB's
   own included. Side threads spawned before side chats (children, `parentThreadId`) still list.

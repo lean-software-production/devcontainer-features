@@ -41,6 +41,16 @@ a regression test that failed before it and passes after.
   are now read page by page (`listAllThreads`, de-duplicated by id), and past 10 000 threads the
   listing fails with a readable error instead of silently truncating.
 
+A second, independent Codex verification of those fixes found new failure paths in three of them.
+Each fix again has a regression test that failed before it and passes after.
+
+- **R1 (T2): a side chat with a tab is never archived.** A failed tab write is not proof that no
+  tab exists: BB can store the write and still answer with an error, and another client can write
+  the same tab during the last conflict. `openSideChat` archived the fork anyway, leaving a tab
+  that pointed at an archived thread. It now reads the coach thread's tabs again first: if one
+  shows the fork, the side chat opened after all. Only a fork confirmed tab-less is archived; when
+  the tabs can't be read, the fork is left alone and the error says so.
+
 ## Names follow the glossary (2026-09-25)
 
 Code, docs and the feature now use the words in [`GLOSSARY.md`](GLOSSARY.md), so a name means the

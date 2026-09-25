@@ -4,6 +4,12 @@ This log covers the MVP build, made while the owner was away. It records every p
 build diverges from [`DESIGN.md`](DESIGN.md) as reviewed in PR #4, and why. Entries are
 newest-first.
 
+## The tutorial dropped Set after (2026-09-25)
+
+The tutorial's lesson table lost its `Set after` column ("Drop days from the iterations"), and
+Tutor refused to load the course. Only `Iteration` and `Spec` are required now; `set` was already
+optional past the header check.
+
 ## Review fixes (2026-09-25)
 
 A Codex (gpt-6-sol) review of the one-tree build found five defects, each reproduced. Each fix has

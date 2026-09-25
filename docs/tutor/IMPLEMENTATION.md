@@ -3,9 +3,11 @@
 This is the builders' shared map for the MVP on branch `tutor/mvp`. It says who owns which files,
 and it pins down every contract between them. [`DESIGN.md`](DESIGN.md) says what to build and
 [`CHANGELOG-from-design.md`](CHANGELOG-from-design.md) overrides it where they differ. The UX is
-[`mockups.html`](mockups.html), round 2, with these picks: sidebar **1B**, lesson page **2A**
-(`ThreadChat layout="document"`), coach moments **3A**, and example states **6B**. Choice buttons
-(3B) are not built.
+[`mockups.html`](mockups.html), round 2, with these picks: sidebar **1B** (now one course outline
+tree), lesson **2A** (now the lesson card leading the coach thread in BB's own thread view), coach
+moments **3A**, and example states **6B** (now also the Rule card). Choice buttons (3B) are not
+built. Words follow [`GLOSSARY.md`](GLOSSARY.md); code keeps some older names (`Rail.tsx`,
+`role: "main"`, `startSideThread`, `homeworkId`).
 
 The plugin is `src/tutor/plugin` (npm `bb-plugin-tutor`, plugin id `tutor`). It targets bb-app
 0.43.4 and pins `@get-bb/plugin-sdk` to exactly 0.5.9.
@@ -74,7 +76,7 @@ The skeleton owns these, and they are all installed. Don't add any.
 | `shared/derive.ts` | `exampleStatus`, `countExamples`, `ruleStatus`, `homeworkExamples`, `findHomework`, `nextHomework`, `findRule`, `findExample`, `resolveCurrent`, `homeworkStatus` | yes (pure; imports only types from the model) |
 | `shared/rpc.ts` | `rpcContract`, plus payload schemas and types (Overview, Lesson, Completion, Binding, TutorThread, …) and `StateChangedSignal` | **type only** |
 | `shared/tools.ts` | `toolParameterSchemas` for the six coach tools, and length limits | backend only |
-| `shared/directives.ts` | `parseProgressCard`, `formatProgressCard`, `parseTermRef`, `formatTermRef` (zod-free) | yes |
+| `shared/directives.ts` | `parseLessonRef`, `formatLessonRef`, `parseProgressCard`, `formatProgressCard`, `parseTermRef`, `formatTermRef`, `ruleAnchor` and `RULE_ANCHOR_ATTRIBUTE` (zod-free) | yes |
 | `shared/routes.ts` | `parseRoute` and `formatRoute` for the navPanel sub-paths | yes |
 | `shared/ports.ts` | `CourseSource`, `ProgressStore`, `CourseLoadError` | backend only |
 | `shared/fixtures.ts` | Schema-valid fixtures: `fixtureCourse` (000–003), `fixtureStudent` (002 WIP), `fixtureFreshStudent`, `fixtureOverview`, `fixtureOverviewUnbound`, `fixtureLesson`, `fixtureCompletion`, `fixtureCandidates`, `fixtureLexicon`, `fixtureThreads`, `fakeHash` | tests and the stub only |
@@ -125,8 +127,8 @@ imports only that file. `loadCourse(coursePath)` works as follows:
 3. **Homework 0** ("Using your tutor", id `000`, set `Start here`, `builtin: true`) comes first. Its
    content lives in `server/course/builtin/`: a `course.yaml` naming `homework-0/`, which holds
    `README.md`, `features/*.feature` and a short `FACTORY.md`. Find its directory from `import.meta.url`, not the working directory. Its
-   Examples teach the interface, for example "When you spin off a side thread from a Rule, then it
-   appears under that Rule".
+   Examples teach the interface, for example "When you ask a side question about the Rule in
+   focus, then a side chat opens in the "Side chat" tab beside your coach thread".
 4. **Lexicon:** each YAML key becomes `{ id, term, definition }`. A missing lexicon gives `[]`.
 5. **Errors:** throw `CourseLoadError` with a message the student can read, naming the file and line
    where there is one.
@@ -152,7 +154,7 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
   `postStartCommand` that runs after `bb-feature-autostart`, from a user-owned copy at
   `<dataDir>/.tutor-feature/plugin-<digest>` (BB rebuilds `dist/` on every path install, so the
   root-owned image copy cannot be installed directly), and skips the install when the plugin is
-  already installed from that path. If BB exposes a way to select the course rail under
+  already installed from that path. If BB exposes a way to select the course outline under
   Settings → Appearance → Sidebar, the feature does that too. Otherwise the first-run page tells the
   student how.
 
@@ -206,44 +208,72 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
   unmanaged workspace guarantees the coach edits the folder Tutor reads, even when the project
   defaults to worktrees. Find it again with `threads.list({ originPluginId: bb.pluginId })` filtered
   by metadata. If there are several, the newest one that isn't archived wins.
-- **Side threads:** the same call plus `parentThreadId: <main>`, with `role: "side"` and an optional
-  `ruleKey`. They share the working tree with the main thread.
+- **Side chats** (`server/coach/side-chats.ts`): what BB's built-in side-chat plugin does.
+  `bb.sdk.threads.fork({ sourceThreadId: <main>, lifecycleOwnerThreadId: <main>, visibility:
+  "hidden", title, pluginMetadata: { course, iteration, role: "side", ruleKey? }, agentContextSeed:
+  [{ type: "text", text, mentions: [], visibility: "agent-only" }] })`, a seed-only fork that stays
+  idle until the student writes in it and reuses the coach's environment. Then the tab BB writes for
+  "Reply in side chat", appended with `threads.tabs.update` (retried up to 3 times on
+  `thread_tabs_conflict`): `{ id: "plugin-panel:" + encodeURIComponent("side-chat:side-chat:" +
+  paramsJson) + ":none", kind: "plugin-panel", pluginId: "side-chat", actionId: "side-chat", title:
+  "Side chat", paramsJson: { threadId, sourceThreadId, sourceMessageText, sourceSeqEnd: null } }`.
+  A plugin cannot select another plugin's tab, so the frontend points to it with a toast. A
+  provider that cannot fork gets a readable error; there is no fallback. The side chats of a coach
+  thread are its live hidden forks (`threads.list({ sourceThreadId, includeHidden: true })`), BB's
+  own included. Side threads spawned before side chats (children, `parentThreadId`) still list.
+- **A fork is never the coach thread.** A thread's role comes from its structure (`threadRole`): a
+  fork or a child is `side`, whatever its metadata says, and a hidden thread that forks nothing is
+  not listed.
+- **Reached Rules:** `tutor_focus_rule` adds the Rule to the coach thread's `reachedRules` metadata
+  (lenient read, at most 500). The coach puts the Rule card at the top of the message that turns to
+  the Rule, so these are the Rules with a section to jump to. They live on the coach thread, not in
+  `PROGRESS.yaml`, because a section exists only in that thread: a new coach thread (or coaching
+  outside BB) has none, and carry-over needs nothing.
 - **Metadata is untrusted.** It is fine for listing threads and filling rails. It must never be used
   to authorise anything.
-- **`configure`** is synchronous. It offers `ALL_TOOL_NAMES` and `SKILL_ID` only when
-  `ctx.origin.pluginId === bb.pluginId`.
-- **Every `execute()`** re-checks that `threads.get(threadId)` has `originPluginId === bb.pluginId`,
-  and returns `{ content: [{ type: "text", text }], isError: true }` otherwise. Everything else it
-  needs (homework, factory root) is re-derived from the binding and the repo, never from metadata.
-  Tool output stays bounded: a few KB.
+- **`configure`** is synchronous. It offers `ALL_TOOL_NAMES` and `SKILL_ID` when
+  `ctx.origin.pluginId === bb.pluginId`, and to a fork whose `sourceThreadId` is a coach thread Tutor
+  has seen (`server/coach/coach-registry.ts`, filled by listings and spawns, warmed at start).
+- **Every `execute()`** re-checks the calling thread with BB (`server/coach/auth.ts`,
+  `coachThreadOf`): a Tutor coach thread; a hidden fork of one (Tutor's side chat, or BB's, which
+  counts as a side chat of that homework without a Rule); or a child Tutor spawned under one. It
+  returns `{ content: [{ type: "text", text }], isError: true }` for anything else, a visible fork
+  or a fork of a side chat included. Only the coach thread itself moves the focus. Everything else
+  it needs (homework, factory root) is re-derived from the binding and the repo, never from
+  metadata. Tool output stays bounded: a few KB.
 - **Tools** use the parameter schemas in `shared/tools.ts`:
 
   | Tool | Does | Returns |
   |---|---|---|
   | `tutor_status` | Current homework, focus, and each Rule's Examples with key, status and name | Compact text the coach can act on, listing keys |
-  | `tutor_focus_rule` | Sets `focus`. Main thread only; side threads get `isError` | A `formatProgressCard({ kind: "focus", … })` line for the coach to echo |
+  | `tutor_focus_rule` | Sets `focus` and records the Rule as reached. Coach thread only; side chats get `isError` | The Rule card, a `formatProgressCard({ kind: "focus", … })` line to put at the top of the next message |
   | `tutor_mark_example` | Sets one Example's status; `evidence` is required for passing and `note` for not-yet (the schema enforces this) | The matching `::tutor-progress` line: `rule-passing` when the Rule just went all-green, otherwise `example-passing` or `not-yet` |
   | `tutor_adopt_iteration` | Only the homework after a Done one, or the first. Copies README.md, FACTORY.md and features/ into `spec/` exactly, copies `spec.md` into `seeds/` as coach-me does, writes ITERATION `NNN WIP` and a fresh PROGRESS.yaml with carry-over. Homework 0 writes only PROGRESS.yaml. **Does not commit**: the coach commits, following coach-me | Summary, and the `git show --stat` hint |
   | `tutor_complete_iteration` | Writes ITERATION `NNN Done` and PROGRESS `summary`. Homework 0 instead requires every Example to be passing or skipped | A `homework-complete` card line |
-  | `tutor_side_thread` | Spawns a side thread (see above) | The new thread id |
+  | `tutor_side_chat` | Forks a side chat of the coach thread, with the question as its seed, and adds its tab (see above) | The new side chat's id, and where the student finds it |
 
 - **Dispatch guard:** an `experimental_hooks` `message.dispatch` handler queues, with a reason, the
-  turn of any Tutor thread whose project has another Tutor thread still running.
-- **Prompts:** the main thread's first prompt names the homework and tells the coach to follow the
-  `tutor` skill. For `startNextHomework`, it also tells the coach to call `tutor_adopt_iteration`
-  first.
+  turn of any Tutor thread (side chats included, BB's own too) whose project has another one still
+  running.
+- **Prompts:** the coach thread's first prompt names the homework, tells the coach to follow the
+  `tutor` skill and carries the lesson card line (`::tutor-lesson{homework="NNN"}`) for its first
+  reply to open with. For `startNextHomework`, it also tells the coach to call
+  `tutor_adopt_iteration` first.
 - **The skill** (`skills/tutor/SKILL.md`) explains the BB-specific behaviour: the tools, the
-  evidence rules, when to emit `::tutor-progress` and `::term{id=…}` (lexicon ids only), side
-  threads, and that only the main thread moves the cursor. It tells the coach to follow the
-  course's `coach` file as its coaching method, and that "jfdi" remains a phrase the student types.
+  evidence rules, the lesson card and Rule cards, when to emit `::tutor-progress` and
+  `::term{id=…}` (lexicon ids only), side chats, and that only the coach thread moves the focus.
+  It tells the coach to follow the course's `coach` file as its coaching method, and that "jfdi"
+  remains a phrase the student types.
 
 ### RPC (BACKEND serves `server/rpc/`, FRONTEND calls)
 
 `shared/rpc.ts` is the contract. It includes the semantics of each method, and every payload shape
 is a zod schema. The methods are `getOverview`, `getLesson`, `getCompletion`, `getThreadContext`,
 `getLexicon`, `listCandidateProjects`, `confirmFactory`, `openCoach`, `startNextHomework`,
-`startSideThread`, `redirectFocus` and `heartbeat` (records student activity; never an error the
-student sees). Handlers fail by throwing an `Error` whose message the
+`startSideThread` (now a BB side chat of the coach thread, returning `{ coachThreadId, sideChatId }`),
+`ensureSideChatTab` (puts a closed side chat tab back), `redirectFocus` and `heartbeat` (records
+student activity; never an error the student sees). Every homework in `getOverview` carries its
+`coachThreadId` and outline with each Rule's `reached`; `getLesson` carries `reachedRules`. Handlers fail by throwing an `Error` whose message the
 student can read. When the course is missing, `getOverview` must still succeed, returning
 `course: null` and `courseError`. It never throws for an unbound factory.
 
@@ -257,17 +287,24 @@ not data.
 
 | Slot (ids in `SLOT_IDS`) | Screen | Data |
 |---|---|---|
-| `experimental_threadList` `course-rail` | 1B: brand, days strip (homeworks grouped by `set`), progress card, the current homework's features and Rules with ✓ ! ○ ● glyphs, a Conversations tray (Tutor threads, with side threads under the coach), Earlier homeworks, Other threads | `getOverview`, plus `experimental_useSidebarThreads` for live status and non-Tutor threads. The rail works out the active homework from the route (`parseRoute`), because `activeThreadId` is null on plugin pages. |
-| `navPanel` `course` at path `course` | `""` redirects to the current lesson or to `welcome`; `lesson/NNN` is 2A (the paper lesson as `ThreadChat` `leadingContent`, `layout="document"`, inside a page-owned `.tutor-grid` scroller, with 6B annotated Gherkin for the Rule in focus and completed Rules collapsed); `complete/NNN` is 7; `welcome` is 8 | `getLesson`, `getCompletion`, `listCandidateProjects`, `confirmFactory`, `openCoach`, `startNextHomework`, `redirectFocus` |
-| `messageDirective` `tutor-progress` and `term` | 3A cards, and lexicon chips with pop-ups | `parseProgressCard` / `parseTermRef` (render nothing unvalidated; return the plain source when parsing fails), `getLexicon` (cache it) |
-| `threadPanelAction` `rule-tab` | 2C / 4: the Rule in focus (or the side thread's `ruleKey`), with Back to coach / Open lesson | `getThreadContext`, `getLesson` |
-| `homepageSection` `continue` | 5: Continue with your coach / Open the lesson | `getOverview` (finds the coach thread itself; `projectId` is usually null) |
+| `experimental_threadList` `course-rail` | The course outline (`app/model/rail.ts`, `app/ui/Rail.tsx`): brand; one tree of every homework (id, title, n/m and a thin bar, ✓ ● ○ status; the current one and the one on screen expanded); under it the coach thread row (or "Start with your coach", or a link to the start page), the coach thread's Rules grouped by feature with ✓ ! ○ ● glyphs, greyed and not clickable until reached, then its side chats (`↳`, "from: <Rule>") and "Ask a side question"; then Other threads | `getOverview` (coach thread, outline, `reached`), plus `experimental_useSidebarThreads` for live status, BB's side chats (hidden forks with `sourceThreadId`) and non-course threads. A Rule opens its section (`useOpenRule`); a side chat opens its coach thread after `ensureSideChatTab`. |
+| `navPanel` `course` at path `course` | `""` redirects to the current lesson route or to `welcome`; `lesson/NNN[/<rule>]` opens the coach thread when there is one (at the Rule's section if the route names a reached Rule; once per history entry, so Back doesn't bounce), else it is the start page (the paper lesson, 6B, and "Start with your coach", which opens the new thread); `complete/NNN` is 7; `welcome` is 8 | `getLesson`, `getCompletion`, `listCandidateProjects`, `confirmFactory`, `openCoach`, `startNextHomework` |
+| `messageDirective` `tutor-lesson`, `tutor-progress` and `term` | The lesson card (homework title, dek, tally, every Rule by feature with live status; reached Rules jump to their section); 3A progress cards, where `focus` is the Rule card (annotated Gherkin with live status, Examples collapsible, "Ask a side question", and the anchor `data-tutor-rule-anchor="<message.threadId>|<homework>/<rule>"`); lexicon chips | `parseLessonRef` / `parseProgressCard` / `parseTermRef` (render nothing unvalidated; return the plain source when parsing fails), `getLesson`, `getLexicon` (cache it) |
+| `threadPanelAction` `rule-tab` | 2C / 4, optional and never opened by Tutor itself: the Rule in focus (or the side chat's `ruleKey`), with Back to coach, Show in the conversation and Work on this Rule next | `getThreadContext`, `getLesson`, `redirectFocus` |
+| `homepageSection` `continue` | 5: Continue with your coach, and the start page while there is no coach thread | `getOverview` (finds the coach thread itself; `projectId` is usually null) |
 | `experimental_sidebarNavigation` `simple-nav` | BB's own navigation rows minus Plugins and Skills, activated through BB; renders BB's original while the `simpleNavigation` setting (boolean, default true) is off or loading | `useSettings` |
 | content script `activity` | none: reports activity for the keep-alive (see "Where things are") | `heartbeat` |
 
 - **Theme:** `bb.themes` contributes `paper` (`THEME_ID`; BB lists it as `plugin:tutor:paper`), a
   light and dark mapping of the workbook palette onto BB's tokens, with Archivo inlined.
   `themes/paper.css` is generated from `app/theme/paper.palette.css` by `npm run fonts`.
+- **Jumping to a Rule's section** (`app/model/rule-jump.ts`, pure and tested; DOM hooks in
+  `app/rule-jump.ts`): open the coach thread, then look for the anchor in the scroller holding the
+  thread's timeline rows (`[data-timeline-row-id^="<thread>:"]` and their scrollable ancestor, never
+  BB's hashed classes). While it is missing, scroll that timeline to its top so BB loads older
+  history, until the anchor appears, the history stops growing, or 20 s pass. Then
+  `scrollIntoView({ block: "start" })` and a brief highlight. Leaving the thread or scrolling by
+  hand cancels it; not finding it is a toast, never an error.
 - **Lost connection:** `useTutorRpc` turns a response that is not one of BB's JSON errors (for
   example the Codespaces port-forwarding proxy's empty 401) or a fetch `TypeError` into
   `ConnectionLostError` (`app/model/rpc-errors.ts`); every error surface then says the connection
@@ -288,9 +325,11 @@ not data.
 ### End-to-end (FEATURE)
 
 - The credential-free provider is the spike's scripted provider, copied to
-  `test/tutor/fixtures/scripted-provider/` (repo root). It echoes `::` lines as assistant markdown,
-  and a `CALL <tool> {json}` line makes a real tool call whose JSON matches
-  `toolParameterSchemas`. Real Claude Code and Codex are never used in tests.
+  `test/tutor/fixtures/scripted-provider/` (repo root). It opens each reply with the prompt's `::`
+  lines and those of its successful tool results (so the lesson card and Rule cards lead as a coach
+  writes them), and a `CALL <tool> {json}` line makes a real tool call whose JSON matches
+  `toolParameterSchemas`. It forks at the tip, so BB side chats work. Real Claude Code and Codex are
+  never used in tests.
 - The feature's scenarios live in `test/tutor/` and follow the `test/bb/` conventions. The
   codespace entry point is `.devcontainer/tutor/devcontainer.json`: `bb`, the `claude-code`,
   `codex` and `pi` agent CLIs, and `tutor`, cloning the public tutorial repo at start-up.

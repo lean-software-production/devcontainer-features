@@ -4,6 +4,75 @@ This log covers the MVP build, made while the owner was away. It records every p
 build diverges from [`DESIGN.md`](DESIGN.md) as reviewed in PR #4, and why. Entries are
 newest-first.
 
+## One tree (2026-09-25)
+
+After trying the MVP, the owner found the split sidebar (course rail above, conversations below)
+and the lesson page confusing. Decisions made with the owner, and the deviations they cause. Words
+follow [`GLOSSARY.md`](GLOSSARY.md): the student reads *lesson* for homework, *course outline* for
+the rail, *side chat* for side thread, *focus* for cursor. The feature is now version 0.3.0.
+
+- **One course outline replaces the rail and the conversations tray** (revises mockup 1B and the
+  3A rail). The homework chips, the progress card, the separate Rule list, the Conversations and
+  Earlier homeworks sections are gone. The sidebar is one tree: every lesson (id, title, n/m with a
+  thin bar, done/current/ahead), the current one open; under a lesson its coach thread (or "Start
+  with your coach"), the coach thread's Rules grouped by feature, and its side chats; then Other
+  threads as before. The code keeps its names (`Rail.tsx`, `rail.ts`, slot `course-rail`).
+- **The coach lives in BB's own thread view; the lesson page is retired as a coach surface**
+  (revises mockup 2A and the spike's `ThreadChat layout="document"` refinement). The lesson still
+  leads the thread, but inside it: the coach's first reply opens with the lesson card
+  (`::tutor-lesson{homework="NNN"}`, from the first prompt), and each Rule's section starts at its
+  Rule card, the `focus` progress card drawn as annotated Gherkin (6B) with live status. Why: one
+  conversation in BB's normal thread view is less confusing than a second, embedded one. The
+  route `lesson/NNN[/<rule>]` opens the coach thread (at the Rule's section when it names one);
+  without a coach thread it is the start page, which keeps the paper lesson and "Start with your
+  coach". Home, the completion page and the Rule tab lead to the thread too.
+- **A plugin cannot open a thread "replace-style"**: `navigate.toThread` always pushes. So the
+  lesson route marks its history entry and opens the coach thread only once; Back to it shows
+  "Open the coach thread →" instead of bouncing.
+- **Clicking a Rule goes to its section; Rules are greyed until the coach reaches them.** A Rule
+  has a section only once the coach has focused it in the coach thread, so `tutor_focus_rule`
+  records it in the coach thread's metadata (`reachedRules`) and returns the Rule card with an
+  instruction to put it at the top of the next message. The record lives on the coach thread, not
+  in `PROGRESS.yaml`, because sections exist only there: a new coach thread, or coaching outside
+  BB, has none, and carry-over has nothing to move. Clicking a Rule no longer messages the coach;
+  "Work on this Rule next" moved to the Rule tab.
+- **Jumping to a section loads older history.** BB's thread view keeps only recent messages in the
+  DOM, so the jump scrolls the timeline to its top until BB has loaded the page with the Rule card,
+  then scrolls the card into view and highlights it. It finds the timeline by the rows BB renders
+  for the thread, not by class names, stops when the history stops growing or after 20 s, and
+  cancels if the student leaves or scrolls. A section it can't find is a toast.
+- **Side threads are replaced by BB side chats.** "Ask a side question" and the coach's new
+  `tutor_side_chat` tool (it replaces `tutor_side_thread`) do what BB's side-chat plugin does: a
+  hidden, seed-only fork of the coach thread, plus the "Side chat" tab BB writes for "Reply in side
+  chat" in the coach thread's right panel. The RPC keeps its name, `startSideThread`. Side chats
+  BB makes itself are listed too. Side threads spawned before this still show under their lesson.
+- **A plugin cannot select another plugin's panel tab** (`openThreadPanel` refuses it; a written
+  tab arrives unselected). So after opening a side chat Tutor opens the coach thread and a toast
+  points to the "Side chat" tab (Ctrl+J shows the right panel). Choosing a side chat in the outline
+  puts its tab back if it was closed (`ensureSideChatTab`).
+- **Side chats did not show up through BB's sidebar thread list** in BB 0.43.4 (the SDK says hidden
+  threads may be in it), so the outline lists them from the backend, per coach thread, refreshed
+  when BB creates one (`thread.created`).
+  BB names its own side chats after the replied-to message; the outline drops any card syntax
+  that message opens with.
+- **BB's own side chats get Tutor's powers.** A hidden fork of a coach thread made by BB's "Reply
+  in side chat" is treated as a side chat of that lesson without a Rule: it is offered the tools
+  and skill, and the tools accept it. Like Tutor's side chats it can read the status and mark
+  Examples but not move the focus. A visible fork ("Fork into new thread") and a fork of a side
+  chat get nothing. A fork is never taken for the coach thread, whatever its metadata says.
+  `configure` is synchronous and can't ask BB about a fork's source, so it checks the coach
+  threads Tutor has listed; every tool call re-checks with BB.
+- **A provider that cannot fork gets a clear error**, and nothing is spawned in its place.
+- **Lesson 0 teaches the new interface**: the course outline, the lesson card, jumping to a Rule
+  and side chats. It now has 5 Rules and 10 Examples; its keys changed, so a student part-way
+  through the old Lesson 0 sees its Examples as pending again.
+- **User-facing copy says "lesson"**: "Lesson 0", coach threads titled `Coach · Lesson 000` (older
+  threads keep their titles; the outline shows the new one). Code, routes and the course's files
+  keep "homework" and "iteration".
+- **The scripted e2e provider forks at the tip** (declared at registration and at the bridge's
+  `initialize`), and opens each reply with the directive lines of its prompt and of its tool
+  results, the way a coach writes the lesson card and Rule cards.
+
 ## Codespace polish (2026-09-25)
 
 After the owner tried a real Codespace from `.devcontainer/tutor`, five changes. The feature is now

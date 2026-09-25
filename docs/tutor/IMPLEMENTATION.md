@@ -208,15 +208,15 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
   title: coachThreadTitle(id), pluginMetadata: { course, lesson, role: "coach" }, prompt })`. The
   unmanaged workspace guarantees the coach edits the folder Tutor reads, even when the project
   defaults to worktrees. `openCoach` finds it again, under the coach-thread lock, in this order:
-  the lesson's record in `bb.storage.kv` (`coach-record.ts`, key
+  `threads.list({ originPluginId: bb.pluginId, projectId, archived: false, includeHidden: false,
+  hasParent: false })` filtered by metadata (`listCoachThreads`: no side chats or side threads in
+  it), where the newest coach thread that isn't archived wins, as it does in the outline and on the
+  start page; if that finds none, the lesson's record in `bb.storage.kv` (`coach-record.ts`, key
   `coach-thread:<project>:<course>:<lesson>`, written whenever a coach thread is found or spawned),
   trusted only while `threads.get` shows that thread live, in the factory project, structurally
-  Tutor's coach thread and with that course and lesson in its metadata; else
-  `threads.list({ originPluginId: bb.pluginId, projectId, archived: false, includeHidden: false,
-  hasParent: false })` filtered by metadata (`listCoachThreads`: no side chats or side threads in it),
-  read a second time before spawning, since `threads.list` pages by offset only (no cursor in SDK
-  0.5.9) and can skip a row when others vanish between pages. If there are several, the newest one
-  that isn't archived wins. Every listing of Tutor's threads and of a coach thread's side chats
+  Tutor's coach thread and with that course and lesson in its metadata; else the listing a second
+  time before spawning. The record and the second listing are there because `threads.list` pages by
+  offset only (no cursor in SDK 0.5.9) and can skip a row when others vanish between pages. Every listing of Tutor's threads and of a coach thread's side chats
   reads every page (`listAllThreads`: 200 rows a call, de-duplicated by id) and throws a readable
   error past 10 000 threads rather than page forever.
 - **Side chats** (`server/coach/side-chats.ts`): what BB's built-in side-chat plugin does.

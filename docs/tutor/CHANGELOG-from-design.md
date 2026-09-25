@@ -79,6 +79,16 @@ Each fix again has a regression test that failed before it and passes after.
   factory project, structurally Tutor's coach thread (`isTutorCoachThread`) and with that course and
   lesson in its metadata. Without a valid record it lists, and lists once more before spawning. The
   coach-thread lock still covers the whole find-or-spawn.
+- **Follow-ups from verifying R1–R3.** Every fix held up under red/green. Two minor defects were
+  found and fixed, each with a test that failed first:
+  - Trusting the record first let `openCoach` pick a different coach thread from the one the
+    outline and start page showed, once a student had unarchived an older coach thread by hand.
+    Now the newest listed coach thread wins everywhere. The record is only used when a listing
+    finds no coach thread, and it's updated to whatever was found.
+  - The swap's rollback put old files back with a plain rename, which silently replaced a file
+    written at the same path during the swap. The rollback now skips any path that's taken, as
+    recovery already did: the newer file stays, and the old copy is kept in
+    `spec/.tutor-previous/` and named in the error. This was in the code before R2.
 
 ## Names follow the glossary (2026-09-25)
 

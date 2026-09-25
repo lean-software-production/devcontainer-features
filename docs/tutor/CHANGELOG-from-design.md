@@ -24,6 +24,12 @@ a regression test that failed before it and passes after.
   the tabs), the fork stayed alive: listed in the outline, with no tab to reach it. The button and
   `tutor_side_chat` now share `openSideChat`, which archives the fork when the tab write fails and
   reports both errors when archiving fails too.
+- **T3: adopting can't erase the previous spec snapshot.** Adoption cleared `spec/` and then copied
+  the lesson, skipping a README.md that had gone missing since the course loaded, so the student
+  was left with the old features and no README. The lesson is now copied into a staging folder
+  inside `spec/` first (README.md required, FACTORY.md optional) and swapped in only when all of it
+  copied; the old files move aside during the swap and come back if it fails. The symbolic-link
+  refusals for `spec/`, `seeds/` and the seed are unchanged.
 
 ## Names follow the glossary (2026-09-25)
 

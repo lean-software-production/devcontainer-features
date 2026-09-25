@@ -6,5 +6,6 @@ check "Node.js 24 is supplied by the test image" bash -c 'test "$(node -p "proce
 check "test runs as the node remote user" bash -c 'test "$(id -un)" = node'
 check "Codex is on the node user's PATH" command -v codex
 check "default Codex returns a semantic version" bash -c 'codex --version | grep -Eq "^codex-cli [0-9]+\\.[0-9]+\\.[0-9]+"'
+check "no model default is written unless requested" test ! -e /etc/codex/config.toml
 
 reportResults

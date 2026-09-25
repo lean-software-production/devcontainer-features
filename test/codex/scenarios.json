@@ -14,5 +14,14 @@
         "version": "0.154.0"
       }
     }
+  },
+  "model": {
+    "image": "mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie",
+    "remoteUser": "node",
+    "features": {
+      "codex": {
+        "model": "gpt-6-sol"
+      }
+    }
   }
 }

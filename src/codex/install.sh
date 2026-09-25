@@ -4,6 +4,7 @@
 set -euo pipefail
 
 CODEX_VERSION="${VERSION:-latest}"
+CODEX_MODEL="${MODEL:-}"
 
 fail() {
     echo "ERROR: $*" >&2
@@ -13,6 +14,12 @@ fail() {
 if [ "${CODEX_VERSION}" != "latest" ] \
     && ! [[ "${CODEX_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
     fail "version must be 'latest' or an exact semantic version (for example, 0.155.1); received '${CODEX_VERSION}'."
+fi
+
+# The model is interpolated into a TOML string, so restrict it to the
+# characters Codex model slugs actually use.
+if [ -n "${CODEX_MODEL}" ] && ! [[ "${CODEX_MODEL}" =~ ^[A-Za-z0-9._:/-]+$ ]]; then
+    fail "model must be a Codex model slug such as gpt-6-sol; received '${CODEX_MODEL}'."
 fi
 
 if [ "$(uname -s)" != "Linux" ]; then
@@ -56,3 +63,17 @@ if [ "${CODEX_BIN}" != "/usr/local/bin/codex" ]; then
 fi
 
 echo "Installed $(/usr/local/bin/codex --version)"
+
+# Set the default model in the system config layer rather than the remote
+# user's ~/.codex/config.toml, so a user's own config (or --model) still wins.
+if [ -n "${CODEX_MODEL}" ]; then
+    CODEX_SYSTEM_CONFIG=/etc/codex/config.toml
+    install -d -m 0755 /etc/codex
+    touch "${CODEX_SYSTEM_CONFIG}"
+    # Top-level keys must precede any [table], so drop an existing top-level
+    # model and prepend ours.
+    { printf 'model = "%s"\n' "${CODEX_MODEL}"; awk '/^[[:space:]]*\[/ { in_table = 1 } in_table || !/^[[:space:]]*model[[:space:]]*=/' "${CODEX_SYSTEM_CONFIG}"; } >"${CODEX_SYSTEM_CONFIG}.tmp"
+    mv "${CODEX_SYSTEM_CONFIG}.tmp" "${CODEX_SYSTEM_CONFIG}"
+    chmod 0644 "${CODEX_SYSTEM_CONFIG}"
+    echo "Set default Codex model to ${CODEX_MODEL} in ${CODEX_SYSTEM_CONFIG}"
+fi

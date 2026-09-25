@@ -230,8 +230,9 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
   the Rule, so these are the Rules with a section to jump to. They live on the coach thread, not in
   `PROGRESS.yaml`, because a section exists only in that thread: a new coach thread (or coaching
   outside BB) has none, and carry-over needs nothing.
-- **Metadata is untrusted.** It is fine for listing threads and filling the outline. It must never be used
-  to authorise anything.
+- **Metadata is untrusted.** It is fine for listing threads and filling the outline, and for knowing
+  which lesson a verified coach thread coaches (below). It must never decide whether a thread is
+  Tutor's.
 - **`configure`** is synchronous. It offers `ALL_TOOL_NAMES` and `SKILL_ID` when
   `ctx.origin.pluginId === bb.pluginId`, and to a fork whose `sourceThreadId` is a coach thread Tutor
   has seen (`server/coach/coach-registry.ts`, filled by listings and spawns, warmed at start).
@@ -239,9 +240,14 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
   `coachThreadOf`): a Tutor coach thread; a hidden fork of one (Tutor's side chat, or BB's, which
   counts as a side chat of that lesson without a Rule); or a child Tutor spawned under one. It
   returns `{ content: [{ type: "text", text }], isError: true }` for anything else, a visible fork
-  or a fork of a side chat included. Only the coach thread itself moves the focus. Everything else
-  it needs (lesson, factory root) is re-derived from the factory project and the repo, never from
-  metadata. Tool output stays bounded: a few KB.
+  or a fork of a side chat included. Only the coach thread itself moves the focus. The caller's
+  lesson is the one its coach thread's Tutor metadata names (Tutor wrote it at spawn; side chats
+  inherit it, and a fork's own metadata is never read for it). `tutor_focus_rule`,
+  `tutor_mark_example` and `tutor_complete_iteration` refuse unless that is the current lesson;
+  `tutor_adopt_iteration` adopts only the caller's lesson; `tutor_side_chat` files the side chat
+  under the caller's lesson; `tutor_status` names the caller's lesson and says when it isn't the
+  current one. The current lesson and the factory root are re-derived from the factory project and
+  the repo. Tool output stays bounded: a few KB.
 - **Tools** use the parameter schemas in `shared/tools.ts`:
 
   | Tool | Does | Returns |
@@ -249,7 +255,7 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
   | `tutor_status` | Current lesson, focus, and each Rule's Examples with key, status and name | Compact text the coach can act on, listing keys |
   | `tutor_focus_rule` | Sets `focus` and records the Rule as reached. Coach thread only; side chats get `isError` | The Rule card, a `formatProgressCard({ kind: "focus", … })` line to put at the top of the next message |
   | `tutor_mark_example` | Sets one Example's status; `evidence` is required for passing and `note` for not-yet (the schema enforces this) | The matching `::tutor-progress` line: `rule-passing` when the Rule just went all-green, otherwise `example-passing` or `not-yet` |
-  | `tutor_adopt_iteration` | Only the lesson after a Done one, or the first. Copies README.md, FACTORY.md and features/ into `spec/` exactly, copies `spec.md` into `seeds/` as coach-me does, writes ITERATION `NNN WIP` and a fresh PROGRESS.yaml with carry-over. Lesson 0 writes only PROGRESS.yaml. **Does not commit**: the coach commits, following coach-me | Summary, and the `git show --stat` hint |
+  | `tutor_adopt_iteration` | Only the caller's own lesson, and only the lesson after a Done one, or the first. Copies README.md, FACTORY.md and features/ into `spec/` exactly, copies `spec.md` into `seeds/` as coach-me does, writes ITERATION `NNN WIP` and a fresh PROGRESS.yaml with carry-over. Lesson 0 writes only PROGRESS.yaml. **Does not commit**: the coach commits, following coach-me | Summary, and the `git show --stat` hint |
   | `tutor_complete_iteration` | Writes ITERATION `NNN Done` and PROGRESS `summary`. Lesson 0 instead requires every Example to be passing or skipped | A `lesson-complete` card line |
   | `tutor_side_chat` | Forks a side chat of the coach thread, with the question as its seed, and adds its tab (see above) | The new side chat's id, and where the student finds it |
 

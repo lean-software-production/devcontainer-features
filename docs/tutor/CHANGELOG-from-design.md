@@ -4,6 +4,22 @@ This log covers the MVP build, made while the owner was away. It records every p
 build diverges from [`DESIGN.md`](DESIGN.md) as reviewed in PR #4, and why. Entries are
 newest-first.
 
+## Review fixes (2026-09-25)
+
+A Codex (gpt-6-sol) review of the one-tree build found five defects, each reproduced. Each fix has
+a regression test that failed before it and passes after.
+
+- **T1: a coach thread changes only its own lesson.** The tools used to act on the current lesson
+  whoever called them, so the Lesson 000 coach, still open after the student adopted Lesson 001,
+  could mark Lesson 001's Examples. The caller's lesson is now its coach thread's (from the Tutor
+  metadata written at spawn; side chats inherit it). Moving the focus, marking and completing refuse
+  unless that is the current lesson, and say which coach to open. A coach adopts only its own
+  lesson, so an old coach no longer adopts the next lesson in its thread: the student starts it
+  from the outline, which spawns its coach. `tutor_status` still answers and says when the thread's
+  lesson isn't current, and a side chat an old coach opens is filed under that coach's lesson. The
+  metadata is writable by other API clients and the thread's own agent, so this guards against
+  mistakes, not a hostile agent (which has a shell in the factory anyway). The skill says so.
+
 ## Names follow the glossary (2026-09-25)
 
 Code, docs and the feature now use the words in [`GLOSSARY.md`](GLOSSARY.md), so a name means the

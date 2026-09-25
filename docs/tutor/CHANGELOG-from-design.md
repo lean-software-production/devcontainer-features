@@ -62,6 +62,17 @@ Each fix again has a regression test that failed before it and passes after.
   `spec/` is missing are moved back, never overwriting one that is there, then the folders are
   removed. A leftover that is a symbolic link is removed without being read or followed. The folders
   sit at the top of `spec/`, never in `spec/features/`, which still holds exactly the lesson's.
+- **R3 (T5): finding a coach thread survives threads vanishing mid-listing.** `threads.list` pages
+  by offset, so with 201 of Tutor's threads, one archived between the first page and the second
+  shifted the coach thread onto the page already read; the second page came back empty and
+  `openCoach` spawned a duplicate. SDK 0.5.9 offers no cursor or keyset paging, but it does filter:
+  coach discovery now asks only for visible threads without a parent (`includeHidden: false,
+  hasParent: false`), so side chats and old side threads never enter that listing. Tutor also
+  records each lesson's coach thread in its own `bb.storage.kv` when it finds or spawns one, and
+  `openCoach` trusts that record first, as long as `threads.get` shows the thread live, in the
+  factory project, structurally Tutor's coach thread (`isTutorCoachThread`) and with that course and
+  lesson in its metadata. Without a valid record it lists, and lists once more before spawning. The
+  coach-thread lock still covers the whole find-or-spawn.
 
 ## Names follow the glossary (2026-09-25)
 

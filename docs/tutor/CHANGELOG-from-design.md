@@ -14,10 +14,12 @@ Behaviour-visible changes:
 
 - **Symbolic links never lead outside their folder.** Tutor refuses to adopt, seed or write
   progress through a symlinked `spec/`, `seeds/` or seed file (a dangling seed link included). It
-  refuses a course whose `course.yaml`, ledger, homework folders, coach or lexicon are symlinks
-  leading outside the course.
+  refuses a course whose `course.yaml`, ledger, root `README.md`, homework folders, coach or
+  lexicon are symlinks leading outside the course.
 - **The course checkout can't be chosen as the factory.** Neither can a folder inside it or one
-  holding it. First run marks such projects "shares a folder with the course".
+  holding it. First run marks such projects "shares a folder with the course". The check is
+  repeated on every load: a stored binding whose folder later leads into the course is treated as
+  missing, so no coach runs and nothing is written.
 - **A homework needs `README.md` and at least one `.feature` file.** `FACTORY.md` and `spec.md`
   are optional. A homework without feature files is a course load error and can never be adopted.
 - **Concurrency.** Progress mutations and "find or spawn the main coach" are serialised per

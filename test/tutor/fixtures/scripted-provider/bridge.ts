@@ -71,11 +71,12 @@ function record(entry: Record<string, unknown>) {
   }
 }
 
+/** Text blocks each start a line: a side chat's agent-only seed comes before the student's message. */
 function promptText(input: readonly PromptInput[]): string {
   return input
     .filter((i): i is Extract<PromptInput, { type: "text" }> => i.type === "text")
     .map((i) => i.text)
-    .join("");
+    .join("\n");
 }
 
 function openSession(a: {

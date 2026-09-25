@@ -4,6 +4,26 @@ This log covers the MVP build, made while the owner was away. It records every p
 build diverges from [`DESIGN.md`](DESIGN.md) as reviewed in PR #4, and why. Entries are
 newest-first.
 
+## Integration (2026-09-25)
+
+Proven end to end in a fresh container built from `.devcontainer/tutor` (ports moved to
+48886/48887, `/workspaces` bind-mounted) with the scripted provider. Changes made while
+integrating:
+
+- **`spec/PROGRESS.yaml` keeps a `history`.** Adopting the next homework used to replace the
+  finished homework's progress, so its lesson said "0 of 9 examples hold · Complete ✓" and its
+  completion page lost the coach's summary. The previous homework's statuses, `adopted` and
+  `summary` now move under `history.<id>` (evidence is left out; it stays in git history).
+- **Coach threads work directly in the factory folder** (`host` environment with an unmanaged
+  workspace) rather than `project-default`, so the coach always edits the folder whose
+  `spec/PROGRESS.yaml` Tutor reads, and side threads share it.
+- **The completion page continues a homework that has already started** ("Continue homework N with
+  your coach", which opens the existing coach) instead of offering "Start", which would fail.
+- **Homework 0's "Coming back later" Example** now says BB home's "Continue with your coach" returns
+  to the coach thread; the home section's separate "Open the lesson" opens the lesson.
+- **The feature installs the plugin from a user-owned, digest-named copy** in BB's data directory,
+  because BB rebuilds `dist/` on every path install.
+
 ## Spike results (2026-09-25)
 
 All six probes worked in a containerised BB 0.43.4. The evidence is in `scripts/tutor-dev/` and

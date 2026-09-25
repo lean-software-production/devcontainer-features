@@ -17,6 +17,11 @@ TUTOR_FEATURE_OPTIONS="$TUTOR_FEATURE_SHARE/options.tsv"
     TUTOR_PLUGIN_ID=tutor
     TUTOR_DEFAULT_THREAD_LIST=thread-list/thread-list
     TUTOR_RAIL_THREAD_LIST=tutor/course-rail
+    TUTOR_DEFAULT_THEME=default
+    # One line: the ISO-8601 UTC time a student last used BB, written by the
+    # plugin. Relative to the runtime directory.
+    TUTOR_ACTIVITY_FILE=activity
+    TUTOR_ACTIVITY_WINDOW_SECONDS=120
 }
 
 tutor_log() {
@@ -41,15 +46,41 @@ tutor_safe_path() {
         && [[ "/$1/" != *'/./'* && "/$1/" != *'/../'* ]]
 }
 
+# A BB plugin id, as the plugin CLI accepts it.
+tutor_plugin_id() { [[ "$1" =~ ^[a-z0-9][a-z0-9-]*$ ]]; }
+# A comma-separated list of plugin ids with no empty items.
+tutor_plugin_list() {
+    local id
+    local -a ids
+    [ -n "$1" ] || return 0
+    [[ "$1" != *, && "$1" != ,* && "$1" != *,,* ]] || return 1
+    IFS=, read -r -a ids <<< "$1"
+    for id in "${ids[@]}"; do tutor_plugin_id "$id" || return 1; done
+}
+# Plugins Tutor runs on: the plugin itself, the sidebar, the agent providers
+# and the workspace environments coach threads use.
+tutor_protected_plugin() {
+    case "$1" in
+        tutor|thread-list|provider-*|environment-project-checkout|environment-personal-workspace|environment-git-worktree) return 0 ;;
+    esac
+    return 1
+}
+# A built-in, custom or plugin theme id, as `bb theme set` takes it.
+tutor_theme_id() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9:._-]*$ ]]; }
+
 tutor_validate_options() {
     TUTOR_COURSE="$(tutor_option COURSE)"
     TUTOR_COURSE_REPO="$(tutor_option COURSE_REPO)"
     TUTOR_FACTORY="$(tutor_option FACTORY)"
     TUTOR_SELECT_RAIL="$(tutor_option SELECT_RAIL)"
+    TUTOR_DISABLE_PLUGINS="$(tutor_option DISABLE_PLUGINS)"
+    TUTOR_THEME="$(tutor_option THEME)"
     tutor_safe_path "$TUTOR_COURSE" || { tutor_fail "unsafe saved course path"; return 1; }
     [ -z "$TUTOR_FACTORY" ] || tutor_safe_path "$TUTOR_FACTORY" || { tutor_fail "unsafe saved factory path"; return 1; }
     [ -z "$TUTOR_COURSE_REPO" ] || { [[ "$TUTOR_COURSE_REPO" = https://* ]] && ! bb_feature_unsafe "$TUTOR_COURSE_REPO"; } || { tutor_fail "unsafe saved courseRepo"; return 1; }
     case "$TUTOR_SELECT_RAIL" in true|false) ;; *) tutor_fail "invalid saved selectRail"; return 1 ;; esac
+    tutor_plugin_list "$TUTOR_DISABLE_PLUGINS" || { tutor_fail "invalid saved disablePlugins"; return 1; }
+    [ -z "$TUTOR_THEME" ] || tutor_theme_id "$TUTOR_THEME" || { tutor_fail "invalid saved theme"; return 1; }
 }
 
 # Requires bb_feature_validate_options and bb_feature_prepare_data_dir. Creates
@@ -87,6 +118,11 @@ process.stdin.on("data", (d) => (input += d)).on("end", () => {
       const p = (data.plugins || []).find((x) => x.id === arg);
       return p ? `${p.rootDir || ""}\t${p.status || ""}` : "";
     },
+    // `bb plugin list --json`: "<id>\tenabled|disabled" lines for every plugin.
+    "plugin-states": () =>
+      (data.plugins || []).map((p) => `${p.id}\t${p.enabled === false ? "disabled" : "enabled"}\n`).join(""),
+    // `bb theme show --json`: the active theme id.
+    theme: () => (typeof data.themeId === "string" ? data.themeId : ""),
     // `bb project list --json`: "yes" when a local source has path <arg>.
     project: () =>
       data.some((p) => (p.sources || []).some((s) => s.type === "local_path" && s.path === arg)) ? "yes" : "",

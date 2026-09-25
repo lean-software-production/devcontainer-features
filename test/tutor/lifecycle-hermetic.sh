@@ -19,7 +19,9 @@ mkdir -p "$bb_share/bin" "$bb_share/npm/bin" "$tutor_share/bin" "$tutor_share/pl
 
 rewrite() { sed -e "s#/usr/local/share/bb#$bb_share#g" -e "s#/usr/local/share/tutor#$tutor_share#g" "$1" > "$2"; }
 rewrite "$repo_root/src/bb/bin/bb-feature-common.sh" "$bb_share/bin/bb-feature-common.sh"
-for name in tutor-feature-common.sh tutor-feature-bootstrap tutor-feature-autostart; do
+for name in tutor-feature-common.sh tutor-feature-bootstrap tutor-feature-autostart tutor-keepalive; do
+    # A missing hook fails its own checks below rather than aborting the run.
+    [ -e "$repo_root/src/tutor/bin/$name" ] || continue
     rewrite "$repo_root/src/tutor/bin/$name" "$tutor_share/bin/$name"
     chmod 755 "$tutor_share/bin/$name"
 done
@@ -55,9 +57,10 @@ bb_options() {
     set_options "$bb_share/options.tsv" VERSION 0.43.4 MODE "${1:-standalone}" AUTOSTART "${2:-true}" \
         SERVER_PORT 48886 HOST_DAEMON_PORT 48887 DATA_DIR "$state" APP_URL auto BB_APP_BIN "$bb_share/npm/bin/bb-app"
 }
+default_disable=automations,workflows,tasks,github
 tutor_options() {
     set_options "$tutor_share/options.tsv" COURSE "$course" COURSE_REPO "${1-https://example.invalid/course.git}" \
-        FACTORY "$factory" SELECT_RAIL "${2:-true}"
+        FACTORY "$factory" SELECT_RAIL "${2:-true}" DISABLE_PLUGINS "${3-$default_disable}" THEME "${4-plugin:tutor:paper}"
 }
 
 printf '#!/bin/sh\nexit 0\n' > "$bb_share/npm/bin/bb-app"
@@ -73,11 +76,35 @@ printf '%s|%s|%s|%s\n' "${BB_SERVER_URL:-}" "${BB_DATA_DIR:-}" "${BB_HOST_DAEMON
 [ ! -e "$fake/down" ] || exit 1
 case "$1 $2" in
     "plugin list")
-        if [ -s "$fake/plugin-root" ]; then
-            printf '{"plugins":[{"id":"tutor","rootDir":"%s","status":"%s"}]}\n' "$(cat "$fake/plugin-root")" "$(cat "$fake/plugin-status")"
+        # $fake/plugins holds "<id> <status>" lines for plugins other than tutor.
+        node -e '
+const fs = require("fs");
+const [rootFile, statusFile, othersFile] = process.argv.slice(1);
+const plugins = [];
+if (fs.existsSync(rootFile) && fs.statSync(rootFile).size) {
+  const status = fs.readFileSync(statusFile, "utf8").trim();
+  plugins.push({ id: "tutor", rootDir: fs.readFileSync(rootFile, "utf8"), status, enabled: status !== "disabled" });
+}
+for (const line of fs.existsSync(othersFile) ? fs.readFileSync(othersFile, "utf8").split("\n").filter(Boolean) : []) {
+  const [id, status] = line.split(" ");
+  plugins.push({ id, rootDir: `/builtin/${id}`, status, enabled: status !== "disabled" });
+}
+console.log(JSON.stringify({ plugins }));' "$fake/plugin-root" "$fake/plugin-status" "$fake/plugins" ;;
+    "plugin disable"|"plugin enable")
+        [ ! -e "$fake/disable-fails" ] || { echo "disable failed" >&2; exit 1; }
+        grep -q "^$3 " "$fake/plugins" 2>/dev/null || { echo "unknown plugin" >&2; exit 1; }
+        [ "$2" = disable ] && next=disabled || next=running
+        sed -i "s/^$3 .*/$3 $next/" "$fake/plugins" ;;
+    "theme show")
+        if [ "$3" = --json ]; then
+            printf '{"themeId":"%s","customCss":null}\n' "$(cat "$fake/theme")"
         else
-            echo '{"plugins":[]}'
+            grep -qxF "$3" "$fake/themes" 2>/dev/null || { echo "Error: HTTP 400: Invalid theme id '$3'." >&2; exit 1; }
+            printf '{"id":"%s"}\n' "$3"
         fi ;;
+    "theme set")
+        grep -qxF "$3" "$fake/themes" 2>/dev/null || { echo "Error: HTTP 400: Invalid theme id '$3'." >&2; exit 1; }
+        printf '%s' "$3" > "$fake/theme" ;;
     "plugin install")
         [ ! -e "$fake/install-fails" ] || { echo "install failed: boom" >&2; exit 1; }
         ls -d "$BB_DATA_DIR"/plugins/toolchain-* > "$fake/toolchain-at-install"
@@ -109,9 +136,14 @@ FAKE
 chmod 755 "$fake/bin/git"
 
 reset_world() {
-    rm -rf "$state" "$course" "$factory" "$fake"/{calls.log,git.log,projects,plugin-root,plugin-status,down,install-fails,reload-fails,git-fails,toolchain-at-install}
+    rm -rf "$state" "$course" "$factory" "$fake"/{calls.log,git.log,projects,plugin-root,plugin-status,down,install-fails,reload-fails,git-fails,toolchain-at-install,disable-fails}
     mkdir -p "$state"
     printf 'thread-list/thread-list' > "$fake/rail"
+    printf '%s\n' "automations running" "workflows disabled" "github running" "thread-list running" \
+        "provider-codex running" "environment-git-worktree running" "keep-awake running" > "$fake/plugins"
+    printf 'default' > "$fake/theme"
+    # The Tutor plugin contributes its theme once it runs; model that as always available.
+    printf '%s\n' default nord plugin:tutor:paper > "$fake/themes"
     bb_options; tutor_options
 }
 run_hook() {
@@ -127,6 +159,8 @@ expect() {
 }
 out_has() { grep -qF -- "$1" "$fixture/out"; }
 calls_have() { grep -qF -- "$1" "$fake/calls.log" 2>/dev/null; }
+calls_lack() { ! grep -qF -- "$1" "$fake/calls.log" 2>/dev/null; }
+plugin_status() { awk -v id="$1" '$1 == id { print $2 }' "$fake/plugins"; }
 
 # --- autostart ------------------------------------------------------------
 reset_world
@@ -230,6 +264,163 @@ run_hook tutor-feature-autostart
 expect "a malformed plugin digest is refused" out_has "plugin digest is missing or malformed"
 cp "$fixture/digest.ok" "$tutor_share/plugin.sha256"
 
+# --- switching off plugins students do not need -----------------------------
+reset_world
+tutor_options https://example.invalid/course.git true "automations,workflows,github,no-such-plugin,tutor,thread-list,provider-codex,environment-git-worktree"
+run_hook tutor-feature-autostart
+expect "disabling plugins passes the hook" test "$rc" = 0
+expect "a listed running plugin is disabled" test "$(plugin_status automations)" = disabled
+expect "every listed running plugin is disabled" test "$(plugin_status github)" = disabled
+expect "an already disabled plugin is not disabled again" calls_lack "plugin disable workflows"
+expect "an unlisted plugin is left alone" test "$(plugin_status keep-awake)" = running
+expect "an unknown plugin is logged" out_has "'no-such-plugin' is not installed"
+expect "tutor is never disabled" calls_lack "plugin disable tutor"
+expect "the thread list is never disabled" test "$(plugin_status thread-list)" = running
+expect "providers are never disabled" test "$(plugin_status provider-codex)" = running
+expect "workspace environments are never disabled" test "$(plugin_status environment-git-worktree)" = running
+expect "a protected plugin is refused with a reason" out_has "refusing to disable 'provider-codex'"
+
+sed -i 's/^automations .*/automations running/' "$fake/plugins"; : > "$fake/calls.log"
+run_hook tutor-feature-autostart
+expect "a plugin the student re-enabled stays on" test "$(plugin_status automations)" = running
+expect "each plugin is disabled only once per state directory" calls_lack "plugin disable"
+
+tutor_options https://example.invalid/course.git true "automations,keep-awake"
+run_hook tutor-feature-autostart
+expect "a plugin added to the list later is disabled once" test "$(plugin_status keep-awake)" = disabled
+expect "adding to the list does not re-disable earlier ones" test "$(plugin_status automations)" = running
+
+reset_world
+touch "$fake/disable-fails"
+run_hook tutor-feature-autostart
+expect "a failed disable fails the hook" test "$rc" = 1
+expect "a failed disable is explained" out_has "cannot disable the plugin 'automations'"
+rm -f "$fake/disable-fails"
+run_hook tutor-feature-autostart
+expect "a failed disable is retried on the next start" test "$(plugin_status automations)" = disabled
+
+reset_world
+tutor_options https://example.invalid/course.git true ""
+run_hook tutor-feature-autostart
+expect "an empty disablePlugins disables nothing" calls_lack "plugin disable"
+
+reset_world
+# shellcheck disable=SC2016 # the literal text is the attack
+tutor_options https://example.invalid/course.git true 'automations,$(touch pwned)'
+run_hook tutor-feature-autostart
+expect "a malformed saved plugin id is refused" out_has "invalid saved disablePlugins"
+expect "nothing is disabled with malformed options" test "$(plugin_status automations)" = running
+
+# --- the Tutor theme ----------------------------------------------------------
+reset_world
+run_hook tutor-feature-autostart
+expect "the Tutor theme is selected over BB's default" test "$(cat "$fake/theme")" = plugin:tutor:paper
+expect "the theme choice is logged" out_has "selected the theme 'plugin:tutor:paper'"
+
+printf 'default' > "$fake/theme"; : > "$fake/calls.log"
+run_hook tutor-feature-autostart
+expect "the theme is chosen only once per state directory" test "$(cat "$fake/theme")" = default
+expect "no theme call after the first choice" calls_lack "theme"
+
+reset_world
+printf 'nord' > "$fake/theme"
+run_hook tutor-feature-autostart
+expect "a student's own theme is kept" test "$(cat "$fake/theme")" = nord
+expect "the kept theme is logged" out_has "theme is already 'nord'"
+printf 'default' > "$fake/theme"; : > "$fake/calls.log"
+run_hook tutor-feature-autostart
+expect "a kept theme still counts as the one decision" calls_lack "theme set"
+
+reset_world
+tutor_options https://example.invalid/course.git true "$default_disable" ""
+run_hook tutor-feature-autostart
+expect "an empty theme option never touches the theme" calls_lack "theme"
+
+reset_world
+printf '%s\n' default nord > "$fake/themes"
+run_hook tutor-feature-autostart
+expect "an unavailable theme does not fail the hook" test "$rc" = 0
+expect "an unavailable theme is logged" out_has "theme 'plugin:tutor:paper' is not available"
+expect "an unavailable theme leaves BB's theme" test "$(cat "$fake/theme")" = default
+printf '%s\n' default nord plugin:tutor:paper > "$fake/themes"
+run_hook tutor-feature-autostart
+expect "the theme is selected once it becomes available" test "$(cat "$fake/theme")" = plugin:tutor:paper
+
+reset_world
+touch "$fake/install-fails"
+run_hook tutor-feature-autostart
+expect "no theme is chosen without the plugin" calls_lack "theme"
+
+reset_world
+run_hook tutor-feature-autostart
+rm -f "$state/.tutor-feature/theme-selected"; printf 'default' > "$fake/theme"; echo disabled > "$fake/plugin-status"
+run_hook tutor-feature-autostart
+expect "no theme is chosen while the plugin is disabled" test "$(cat "$fake/theme")" = default
+
+reset_world
+tutor_options https://example.invalid/course.git true "$default_disable" 'x;y'
+run_hook tutor-feature-autostart
+expect "a malformed saved theme is refused" out_has "invalid saved theme"
+
+# --- keep-alive ---------------------------------------------------------------
+activity="$state/.tutor-feature/activity"
+run_keepalive() {
+    set +e
+    env PATH="$fake/bin:$PATH" "$@" > "$fixture/out" 2>&1
+    rc=$?
+    set -e
+}
+reset_world
+mkdir -p "$state/.tutor-feature"
+date -u +%FT%T.123Z > "$activity"
+run_keepalive "$tutor_share/bin/tutor-keepalive" --once
+expect "keep-alive reports fresh BB activity" out_has "you're active in BB"
+expect "keep-alive prints exactly one line per check" bash -c "test \"\$(wc -l < '$fixture/out')\" = 1 && grep -q 'keeping this Codespace awake' '$fixture/out'"
+
+date -u -d '-121 seconds' +%FT%TZ > "$activity"
+run_keepalive "$tutor_share/bin/tutor-keepalive" --once
+expect "keep-alive is silent for stale activity" test ! -s "$fixture/out"
+date -u -d '-100 seconds' +%FT%TZ > "$activity"
+run_keepalive "$tutor_share/bin/tutor-keepalive" --once
+expect "activity within 120 s counts" out_has "you're active in BB"
+rm -f "$activity"
+run_keepalive "$tutor_share/bin/tutor-keepalive" --once
+expect "keep-alive is silent without an activity file" test ! -s "$fixture/out"
+printf 'yesterday\n' > "$activity"
+run_keepalive "$tutor_share/bin/tutor-keepalive" --once
+expect "keep-alive is silent for a malformed timestamp" test ! -s "$fixture/out"
+date -u -d '+1 hour' +%FT%TZ > "$activity"
+run_keepalive "$tutor_share/bin/tutor-keepalive" --once
+expect "keep-alive ignores a timestamp in the future" test ! -s "$fixture/out"
+
+run_keepalive env -u CODESPACES -u TUTOR_KEEPALIVE_FORCE "$tutor_share/bin/tutor-keepalive"
+expect "outside a Codespace keep-alive returns at once" test "$rc" = 0
+expect "outside a Codespace keep-alive says why" out_has "only runs in a GitHub Codespace"
+run_keepalive env CODESPACES=true "$tutor_share/bin/tutor-keepalive"
+expect "without a terminal keep-alive returns at once" test "$rc" = 0
+expect "without a terminal keep-alive says why" out_has "not a terminal"
+
+# A Codespace attach terminal is a pty: there the loop keeps running.
+date -u +%FT%TZ > "$activity"
+run_keepalive env -u TUTOR_KEEPALIVE_FORCE CODESPACES=true TUTOR_KEEPALIVE_INTERVAL=1 \
+    script -qec "timeout 3 '$tutor_share/bin/tutor-keepalive'" /dev/null
+expect "in a Codespace terminal keep-alive keeps running" test "$rc" = 124
+expect "in a Codespace terminal keep-alive announces itself" out_has "keep-alive is on"
+expect "in a Codespace terminal keep-alive reports activity" out_has "you're active in BB"
+
+env PATH="$fake/bin:$PATH" TUTOR_KEEPALIVE_FORCE=1 TUTOR_KEEPALIVE_INTERVAL=1 \
+    "$tutor_share/bin/tutor-keepalive" > "$fixture/first.out" 2>&1 &
+first=$!
+for _ in $(seq 1 50); do grep -q "active in BB" "$fixture/first.out" 2>/dev/null && break; sleep 0.1; done
+expect "the loop reports activity" grep -q "you're active in BB" "$fixture/first.out"
+run_keepalive env TUTOR_KEEPALIVE_FORCE=1 TUTOR_KEEPALIVE_INTERVAL=1 timeout 5 "$tutor_share/bin/tutor-keepalive"
+expect "a second keep-alive exits at once" test "$rc" = 0
+expect "a second keep-alive says one is already running" out_has "already running"
+expect "a second keep-alive never reports activity" bash -c "! grep -q 'active in BB' '$fixture/out'"
+kill "$first" 2>/dev/null || true; wait "$first" 2>/dev/null || true
+run_keepalive env TUTOR_KEEPALIVE_FORCE=1 TUTOR_KEEPALIVE_INTERVAL=1 timeout 2 "$tutor_share/bin/tutor-keepalive"
+expect "a new keep-alive can start once the old one is gone" out_has "you're active in BB"
+
 # --- bootstrap ------------------------------------------------------------
 reset_world
 run_hook tutor-feature-bootstrap
@@ -253,7 +444,8 @@ expect "a failed clone does not fail the hook" test "$rc" = 0
 expect "a failed clone says how to recover" out_has "clone it yourself with: git clone https://example.invalid/course.git $course"
 
 reset_world
-set_options "$tutor_share/options.tsv" COURSE "/nonexistent-parent-$$/course" COURSE_REPO https://example.invalid/course.git FACTORY "" SELECT_RAIL true
+set_options "$tutor_share/options.tsv" COURSE "/nonexistent-parent-$$/course" COURSE_REPO https://example.invalid/course.git FACTORY "" SELECT_RAIL true \
+    DISABLE_PLUGINS "" THEME ""
 run_hook tutor-feature-bootstrap
 expect "an unwritable parent is reported, not fatal" test "$rc" = 0
 expect "no clone is attempted into an unwritable parent" test ! -e "$fake/git.log"

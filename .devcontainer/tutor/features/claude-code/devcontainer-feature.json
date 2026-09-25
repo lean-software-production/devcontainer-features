@@ -1,0 +1,21 @@
+{
+  "id": "claude-code",
+  "version": "1.0.0",
+  "name": "Claude Code",
+  "description": "Installs the Claude Code coding-agent CLI globally. Requires Node.js 22+ and npm supplied by the base image or another feature.",
+  "documentationURL": "https://github.com/lean-software-production/devcontainer-features/tree/main/src/claude-code",
+  "options": {
+    "version": {
+      "type": "string",
+      "proposals": [
+        "latest",
+        "2.1.278"
+      ],
+      "default": "latest",
+      "description": "Claude Code npm version to install. 'latest' is the rolling default; use an exact version for reproducible containers."
+    }
+  },
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/node"
+  ]
+}

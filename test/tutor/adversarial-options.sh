@@ -36,6 +36,12 @@ expect_reject 'ssh courseRepo' 'courseRepo must be' COURSEREPO=git@github.com:le
 expect_reject 'plain http courseRepo' 'courseRepo must be' COURSEREPO=http://github.com/lean-software-production/tutorial.git
 expect_reject 'option injection in courseRepo' 'courseRepo must be' COURSEREPO='--upload-pack=touch pwned'
 expect_reject 'credentials in courseRepo' 'no credentials' COURSEREPO=https://user:secret@github.com/x/y.git
+expect_reject 'shell injection in disablePlugins' 'disablePlugins must be' DISABLEPLUGINS='automations;touch pwned'
+expect_reject 'upper case in disablePlugins' 'disablePlugins must be' DISABLEPLUGINS=Automations
+expect_reject 'empty item in disablePlugins' 'disablePlugins must be' DISABLEPLUGINS='automations,,workflows'
+expect_reject 'space in disablePlugins' 'disablePlugins must be' DISABLEPLUGINS='automations, workflows'
+expect_reject 'shell injection in theme' 'theme must be' THEME='plugin:tutor:paper;touch pwned'
+expect_reject 'space in theme' 'theme must be' THEME='my theme'
 test ! -e "$tmp/pwned"
 test ! -e pwned
 
@@ -43,5 +49,7 @@ test ! -e pwned
 # at the missing bb Feature.
 expect_reject 'defaults without the bb Feature' 'the bb Feature must be installed first'
 expect_reject 'explicit options without the bb Feature' 'the bb Feature must be installed first' \
-    COURSE=/workspaces/course/ COURSEREPO= FACTORY=/workspaces/my-factory SELECTRAIL=false
+    COURSE=/workspaces/course/ COURSEREPO= FACTORY=/workspaces/my-factory SELECTRAIL=false DISABLEPLUGINS= THEME=
+expect_reject 'plugin list and theme without the bb Feature' 'the bb Feature must be installed first' \
+    DISABLEPLUGINS=automations,tutor,provider-codex THEME=nord
 echo 'tutor adversarial option validation passed'

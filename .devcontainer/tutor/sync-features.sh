@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Refresh the committed copies of src/bb and src/tutor under features/.
+# Refresh the committed copies of this repository's Features under features/:
+# every "./features/<id>" that devcontainer.json uses is a copy of src/<id>.
 #
 #   .devcontainer/tutor/sync-features.sh           rewrite the copies
 #   .devcontainer/tutor/sync-features.sh --check   fail if they are stale (CI)
@@ -12,7 +13,21 @@ set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(git -C "$here" rev-parse --show-toplevel)"
-features=(bb tutor)
+# The entry point uses only whole-line // comments, like codespace-entry.sh assumes.
+mapfile -t features < <(node - "$here/devcontainer.json" <<'JS'
+const fs = require("fs");
+const text = fs.readFileSync(process.argv[2], "utf8").split("\n").filter((l) => !/^\s*\/\//.test(l)).join("\n");
+for (const ref of Object.keys(JSON.parse(text).features || {})) {
+  const m = /^\.\/features\/([a-z0-9-]+)$/.exec(ref);
+  if (!m) throw new Error(`unexpected Feature reference ${ref}; only ./features/<id> copies of src/<id> are synced`);
+  console.log(m[1]);
+}
+JS
+)
+[ "${#features[@]}" -gt 0 ] || { echo "ERROR: no ./features/<id> references in devcontainer.json" >&2; exit 1; }
+for name in "${features[@]}"; do
+    [ -f "$repo/src/$name/devcontainer-feature.json" ] || { echo "ERROR: devcontainer.json uses ./features/$name but src/$name is not a Feature" >&2; exit 1; }
+done
 
 copy_features() {
     local out="$1" name

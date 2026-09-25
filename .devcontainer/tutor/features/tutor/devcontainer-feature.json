@@ -1,6 +1,6 @@
 {
   "id": "tutor",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "name": "Tutor coached course for BB",
   "description": "Adds the Tutor BB plugin to the bb Feature's standalone server: a course rail, lesson pages and a coach that works one Gherkin Rule at a time. Requires the bb Feature in standalone mode.",
   "documentationURL": "https://github.com/lean-software-production/devcontainer-features/tree/main/src/tutor",
@@ -25,6 +25,21 @@
       "type": "boolean",
       "default": true,
       "description": "Select the Tutor course rail as BB's sidebar thread list once, unless another thread list was chosen already."
+    },
+    "disablePlugins": {
+      "type": "string",
+      "proposals": [
+        "automations,workflows,tasks,scheduled-send,github,browser-automation,agent-annotations,connect,plugin-api-docs,plugin-api-tester,theme-preview,keep-awake,account-pool,environment-modal-sandbox",
+        ""
+      ],
+      "default": "automations,workflows,tasks,scheduled-send,github,browser-automation,agent-annotations,connect,plugin-api-docs,plugin-api-tester,theme-preview,keep-awake,account-pool,environment-modal-sandbox",
+      "description": "Comma-separated BB plugin ids to switch off once per BB state directory, so a student can turn any back on. Plugins that are not installed are skipped; tutor, thread-list, provider-* and the workspace environments are never switched off. Empty switches off nothing."
+    },
+    "theme": {
+      "type": "string",
+      "proposals": ["plugin:tutor:paper", ""],
+      "default": "plugin:tutor:paper",
+      "description": "BB theme id to select once per BB state directory, only while BB's default theme is active. Empty leaves BB's theme alone."
     }
   },
   "postCreateCommand": "/usr/local/share/tutor/bin/tutor-feature-bootstrap",

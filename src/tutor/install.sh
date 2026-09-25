@@ -10,6 +10,8 @@ TUTOR_COURSE="${COURSE-/workspaces/tutorial}"
 TUTOR_COURSE_REPO="${COURSEREPO-https://github.com/lean-software-production/tutorial.git}"
 TUTOR_FACTORY="${FACTORY-}"
 TUTOR_SELECT_RAIL="${SELECTRAIL:-true}"
+TUTOR_DISABLE_PLUGINS="${DISABLEPLUGINS-automations,workflows,tasks,scheduled-send,github,browser-automation,agent-annotations,connect,plugin-api-docs,plugin-api-tester,theme-preview,keep-awake,account-pool,environment-modal-sandbox}"
+TUTOR_THEME="${THEME-plugin:tutor:paper}"
 
 FEATURE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SHARE_DIR=/usr/local/share/tutor
@@ -34,6 +36,21 @@ valid_path "$TUTOR_COURSE" || fail "course must be an absolute path without dot 
 [ -z "$TUTOR_FACTORY" ] || valid_path "$TUTOR_FACTORY" || fail "factory must be empty or an absolute path without dot segments, control characters, quotes or shell metacharacters; received '$TUTOR_FACTORY'."
 [ -z "$TUTOR_FACTORY" ] || [ "$TUTOR_FACTORY" != "$TUTOR_COURSE" ] || fail "factory and course must be different directories."
 case "$TUTOR_SELECT_RAIL" in true|false) ;; *) fail "selectRail must be true or false; received '$TUTOR_SELECT_RAIL'." ;; esac
+# The same rules as the start-up hook's tutor_plugin_list and tutor_theme_id.
+if [ -n "$TUTOR_DISABLE_PLUGINS" ]; then
+    [[ "$TUTOR_DISABLE_PLUGINS" =~ ^[a-z0-9][a-z0-9-]*(,[a-z0-9][a-z0-9-]*)*$ ]] \
+        || fail "disablePlugins must be empty or comma-separated plugin ids (lower-case letters, digits and '-', no spaces); received '$TUTOR_DISABLE_PLUGINS'."
+fi
+for tutor_plugin in ${TUTOR_DISABLE_PLUGINS//,/ }; do
+    case "$tutor_plugin" in
+        tutor|thread-list|provider-*|environment-project-checkout|environment-personal-workspace|environment-git-worktree)
+            echo "tutor Feature: disablePlugins lists '$tutor_plugin', which Tutor needs; it will never be disabled." >&2 ;;
+    esac
+done
+if [ -n "$TUTOR_THEME" ]; then
+    [[ "$TUTOR_THEME" =~ ^[A-Za-z0-9][A-Za-z0-9:._-]*$ ]] \
+        || fail "theme must be empty or a BB theme id such as 'plugin:tutor:paper' or 'nord'; received '$TUTOR_THEME'."
+fi
 if [ -n "$TUTOR_COURSE_REPO" ]; then
     { [[ "$TUTOR_COURSE_REPO" = https://* ]] && ! has_unsafe_chars "$TUTOR_COURSE_REPO" && [[ "$TUTOR_COURSE_REPO" != *[[:space:]]* ]]; } \
         || fail "courseRepo must be empty or an https:// URL without spaces or shell metacharacters."
@@ -96,29 +113,45 @@ find "$PLUGIN_DIR" -path "$PLUGIN_DIR/node_modules" -prune -o -type f -exec chmo
 (cd "$PLUGIN_DIR" && find . -path ./node_modules -prune -o -type f -print0 \
     | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1) > "$SHARE_DIR/plugin.sha256"
 
-# The plugin reads course/factory from this JSON; the hooks read options.tsv.
+# The BB state directory the hooks use, resolved as bb_feature_data_dir does
+# for the remote user, so the plugin can find <dataDir>/.tutor-feature.
+if [ -n "$BB_FEATURE_RAW_DATA_DIR" ]; then
+    tutor_data_dir="$BB_FEATURE_RAW_DATA_DIR"
+elif [ -n "${_REMOTE_USER_HOME:-}" ] && valid_path "${_REMOTE_USER_HOME%/}"; then
+    tutor_data_dir="${_REMOTE_USER_HOME%/}/.bb"
+else
+    tutor_data_dir=
+    echo "tutor Feature: the remote user's home is unknown, so config.json has no dataDir." >&2
+fi
+
+# The plugin reads course/factory/dataDir from this JSON; the hooks read options.tsv.
 install -d -m 0755 "$CONFIG_DIR"
 node -e '
-const [course, factory] = process.argv.slice(1);
+const [course, factory, dataDir] = process.argv.slice(1);
 const config = { course };
 if (factory) config.factory = factory;
+if (dataDir) config.dataDir = dataDir;
 process.stdout.write(JSON.stringify(config, null, 2) + "\n");
-' "$TUTOR_COURSE" "$TUTOR_FACTORY" > "$CONFIG_DIR/config.json"
+' "$TUTOR_COURSE" "$TUTOR_FACTORY" "$tutor_data_dir" > "$CONFIG_DIR/config.json"
 write_option() { printf '%s\t%s\n' "$1" "$2"; }
 {
     write_option COURSE "$TUTOR_COURSE"
     write_option COURSE_REPO "$TUTOR_COURSE_REPO"
     write_option FACTORY "$TUTOR_FACTORY"
     write_option SELECT_RAIL "$TUTOR_SELECT_RAIL"
+    write_option DISABLE_PLUGINS "$TUTOR_DISABLE_PLUGINS"
+    write_option THEME "$TUTOR_THEME"
 } > "$SHARE_DIR/options.tsv"
 chown root:root "$CONFIG_DIR/config.json" "$SHARE_DIR/options.tsv" "$SHARE_DIR/plugin.sha256"
 chmod 0644 "$CONFIG_DIR/config.json" "$SHARE_DIR/options.tsv" "$SHARE_DIR/plugin.sha256"
 
 install -m 0755 "$FEATURE_DIR/bin/tutor-feature-bootstrap" "$SHARE_DIR/bin/tutor-feature-bootstrap"
 install -m 0755 "$FEATURE_DIR/bin/tutor-feature-autostart" "$SHARE_DIR/bin/tutor-feature-autostart"
+install -m 0755 "$FEATURE_DIR/bin/tutor-keepalive" "$SHARE_DIR/bin/tutor-keepalive"
 install -m 0644 "$FEATURE_DIR/bin/tutor-feature-common.sh" "$SHARE_DIR/bin/tutor-feature-common.sh"
 ln -sfn "$SHARE_DIR/bin/tutor-feature-bootstrap" /usr/local/bin/tutor-feature-bootstrap
 ln -sfn "$SHARE_DIR/bin/tutor-feature-autostart" /usr/local/bin/tutor-feature-autostart
+ln -sfn "$SHARE_DIR/bin/tutor-keepalive" /usr/local/bin/tutor-keepalive
 
 plugin_version="$(node -e 'process.stdout.write(require(process.argv[1]).version)' "$PLUGIN_DIR/package.json")"
 echo "Installed the Tutor plugin ${plugin_version} in ${PLUGIN_DIR}; it is path-installed into BB when the container starts."

@@ -4,7 +4,9 @@ Adds the Tutor BB plugin to the [bb Feature](../bb)'s standalone server: a
 course rail in the sidebar, lesson pages, and a coach thread per homework that
 works one Gherkin Rule at a time. The plugin is prebuilt while the image is
 built and path-installed into BB each time the container starts; nothing is
-fetched at start-up except the optional course clone.
+fetched at start-up except the optional course clone. On first start it also
+brands BB with the Tutor paper theme and switches off BB plugins a student
+does not need; a student can undo either.
 
 ## Example Usage
 
@@ -40,6 +42,18 @@ which composes local copies of both Features.
 | `courseRepo` | string | `https://github.com/lean-software-production/tutorial.git` | HTTPS Git URL cloned into `course` after the container is created, if `course` does not exist. Empty never clones. |
 | `factory` | string | empty | Optional absolute path of the student's factory repository. Registered as a BB project once it exists, and pre-selected by the plugin. |
 | `selectRail` | boolean | `true` | Select the course rail as BB's sidebar thread list once, unless another thread list was chosen already. |
+| `disablePlugins` | string | `automations,workflows,tasks,scheduled-send,github,browser-automation,agent-annotations,connect,plugin-api-docs,plugin-api-tester,theme-preview,keep-awake,account-pool,environment-modal-sandbox` | Comma-separated BB plugin ids to switch off once per BB state directory; a student can turn any back on. Missing plugins are skipped. `tutor`, `thread-list`, `provider-*` and the workspace environments are never switched off. Empty switches off nothing. |
+| `theme` | string | `plugin:tutor:paper` | BB theme to select once per BB state directory, only while BB's default theme is active. Empty leaves the theme alone. |
+
+The Feature also installs `tutor-keepalive`, which keeps a GitHub Codespace
+awake while the student uses BB. It is not a lifecycle command of the Feature,
+because it runs until its terminal closes and would hold up any
+`postAttachCommand` after it. Add it to your configuration's own
+`postAttachCommand`, in the object form so that it runs beside other commands:
+
+```jsonc
+"postAttachCommand": { "tutor-keepalive": "tutor-keepalive" }
+```
 
 Requires the bb Feature in `standalone` mode, installed first, on the Linux
 amd64 Debian/Ubuntu Node.js images the bb Feature supports.

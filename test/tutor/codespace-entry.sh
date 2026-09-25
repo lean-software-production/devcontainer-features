@@ -47,12 +47,43 @@ in_container() {
     "$devcontainer" exec --workspace-folder "$workspace" --id-label "$label" \
         env BB_SERVER_URL=http://127.0.0.1:48886 BB_HOST_DAEMON_PORT=48887 BB_DATA_DIR=/home/node/.bb-state "$@"
 }
-in_container bb-feature-status
-in_container git -C /home/node/tutorial rev-parse --verify HEAD >/dev/null
-in_container bash -c 'bb plugin list --json | node -e "
+# Each check names itself; a failure shows the Tutor start-up log.
+check() {
+    local what="$1"; shift
+    if "$@"; then echo "ok   $what"; return 0; fi
+    echo "FAIL $what" >&2
+    in_container cat /home/node/.bb-state/.tutor-feature/autostart.log >&2 || true
+    exit 1
+}
+check "bb is running" in_container bb-feature-status
+check "the course was cloned" in_container git -C /home/node/tutorial rev-parse --verify HEAD
+check "the Tutor plugin is running" in_container bash -c 'bb plugin list --json | node -e "
 let s = \"\"; process.stdin.on(\"data\", (d) => (s += d)).on(\"end\", () => {
   const p = JSON.parse(s).plugins.find((x) => x.id === \"tutor\");
   if (!p || p.status !== \"running\") { console.error(\"tutor plugin is not running:\", p); process.exit(1); }
 });"'
-in_container bash -c 'bb settings ui get sidebar.threadListProvider --json | grep -q "\"tutor/course-rail\""'
-echo 'Codespace entry point came up with Tutor running'
+check "the course rail is selected" in_container bash -c 'bb settings ui get sidebar.threadListProvider --json | grep -q "\"tutor/course-rail\""'
+# The agent CLIs are on BB's fixed PATH, and BB's host machine finds them.
+# shellcheck disable=SC2016 # expanded in the container
+check "claude, codex and pi are in /usr/local/bin" in_container bash -c 'for cli in claude codex pi; do test -x "/usr/local/bin/$cli" || { echo "missing /usr/local/bin/$cli" >&2; exit 1; }; done'
+check "the agent CLIs run with BB's PATH" in_container env PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin bash -c 'claude --version && codex --version && pi --version'
+check "BB sees the three providers installed" in_container bash -c 'bb updates status --json | node -e "
+let s = \"\"; process.stdin.on(\"data\", (d) => (s += d)).on(\"end\", () => {
+  const status = JSON.parse(s).machines[0].providerStatus;
+  const missing = [\"claude-code\", \"codex\", \"pi\"].filter((id) => !(status[id] && status[id].installed));
+  if (missing.length) { console.error(\"BB does not see these providers installed:\", missing, status); process.exit(1); }
+});"'
+check "plugins students do not need are off, and Tutor's own are on" in_container bash -c 'bb plugin list --json | node -e "
+let s = \"\"; process.stdin.on(\"data\", (d) => (s += d)).on(\"end\", () => {
+  const plugins = JSON.parse(s).plugins;
+  const on = plugins.filter((p) => [\"automations\", \"connect\", \"scheduled-send\", \"keep-awake\"].includes(p.id) && p.enabled !== false);
+  const off = plugins.filter((p) => (p.id === \"tutor\" || p.id === \"thread-list\" || p.id.startsWith(\"provider-\")) && p.enabled === false);
+  if (on.length || off.length) { console.error(\"still on:\", on.map((p) => p.id), \"wrongly off:\", off.map((p) => p.id)); process.exit(1); }
+});"'
+check "the Tutor theme is selected" in_container bash -c 'bb theme show --json | grep -q "\"themeId\": \"plugin:tutor:paper\""'
+check "config.json tells the plugin where the activity file goes" in_container node -e 'const c = require("/usr/local/etc/tutor/config.json"); if (c.dataDir !== "/home/node/.bb-state") { console.error(c); process.exit(1); }'
+# Outside Codespaces the attach-time keep-alive returns at once, so it never
+# holds up devcontainer up (which has already run it as postAttachCommand).
+check "postAttachCommand ran tutor-keepalive" grep -q "only runs in a GitHub Codespace" "$workspace/up.log"
+check "tutor-keepalive returns at once outside Codespaces" in_container bash -c 'timeout 10 tutor-keepalive | grep -q "only runs in a GitHub Codespace"'
+echo 'Codespace entry point came up with Tutor running, the agent CLIs installed and BB branded'

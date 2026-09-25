@@ -7,13 +7,21 @@ and is modelled on upstream `examples/plugins/echo-provider`.
 **Never install this into a BB you care about.** Use a disposable container,
 such as the Feature scenarios in `test/tutor/` or `scripts/tutor-dev/`.
 
-Every turn replies with one assistant message that reports:
+Every turn replies with one assistant message. It opens with:
 
-- the `dynamicTools` BB offered at `thread/start` or `thread/resume` (tool
-  scoping by `bb.agents.configure`, as the provider sees it),
-- the skills BB offered through `skills/configure`, and
 - every prompt line that starts with `::`, echoed verbatim, so message
-  directives render as real assistant markdown.
+  directives render as real assistant markdown, and
+- every line starting with `::` in the result of a tool call it made, as a
+  coach echoes the cards Tutor's tools return. So a `CALL tutor_focus_rule`
+  turn opens with that Rule's card, and a first prompt carrying
+  `::tutor-lesson{…}` gets a first reply that opens with the lesson card.
+
+Then it reports:
+
+- the `dynamicTools` BB offered at `thread/start`, `thread/resume` or
+  `thread/fork` (tool scoping by `bb.agents.configure`, as the provider sees
+  it), and
+- the skills BB offered through `skills/configure`.
 
 Two prompt lines make the bridge call a tool:
 
@@ -21,6 +29,12 @@ Two prompt lines make the bridge call a tool:
   tool was offered.
 - `FORCECALL <tool> {json}` calls it even if it was not offered. BB 0.43.4 runs
   such a call, so this checks that the plugin's own `execute()` refuses it.
+
+It forks at the tip (`fork: "tip"`, declared both when the provider registers
+and in the bridge's `initialize` reply, which may only narrow it). A fork opens
+a fresh session with nothing of the source's history, which is all a script
+needs, so BB side chats work: "Reply in side chat" and Tutor's "Ask a side
+question" both make a hidden fork.
 
 Every event is also appended to
 `<BB dataDir>/plugins/scripted-provider/bridge-data/turns.ndjson`.

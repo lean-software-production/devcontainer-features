@@ -1,12 +1,15 @@
 // Scripted provider bridge (Tutor test fixture). Protocol v2, grammar v3.
 //
 // Every turn replies with one agent message:
-//   - the dynamic tools BB offered at thread/start|resume (names),
-//   - the skills BB offered via skills/configure (names),
+//   - every prompt line starting with `::` echoed verbatim (message
+//     directives), then every `::` line of a successful tool result, as a
+//     coach echoes the cards the tutor tools return; these open the message,
+//   - the dynamic tools BB offered at thread/start|resume|fork (names),
+//   - the skills BB offered via skills/configure (names), and
 //   - the result of calling a tool named in a `CALL <tool> <json>` prompt line
 //     (only if that tool was offered; `FORCECALL` skips that check to test
-//     that the plugin itself refuses a tool it did not offer), and
-//   - every prompt line starting with `::` echoed verbatim (message directives).
+//     that the plugin itself refuses a tool it did not offer).
+// thread/fork opens a fresh session at the source's tip, so BB side chats work.
 // Each turn is also appended to <dataDir>/turns.ndjson for headless evidence.
 import {
   type DynamicTool,
@@ -26,6 +29,7 @@ import {
   runBridgeRequest,
   skillsConfigureParamsSchema,
   threadResumeParamsSchema,
+  threadForkParamsSchema,
   threadStartParamsSchema,
   threadStopParamsSchema,
   turnStartParamsSchema,
@@ -97,6 +101,11 @@ function openSession(a: {
   return s;
 }
 
+/** Message directives: lines that start with `::`, trimmed. */
+function directiveLines(lines: readonly string[]): string[] {
+  return lines.filter((l) => /^\s*::[a-z]/.test(l)).map((l) => l.trim());
+}
+
 function callTool(s: Session, tool: string, args: unknown): Promise<{ content: string; isError: boolean }> {
   counter += 1;
   const id = `scripted-req-${counter}`;
@@ -129,6 +138,7 @@ async function runTurn(s: Session, input: readonly PromptInput[], clientRequestI
 
   const lines = prompt.split(/\r?\n/);
   const toolReport: string[] = [];
+  const echoed: string[] = [];
   for (const line of lines) {
     const m = /^\s*(FORCE)?CALL\s+([A-Za-z0-9_-]+)\s*(\{.*\})?\s*$/.exec(line);
     if (m === null) continue;
@@ -158,18 +168,19 @@ async function runTurn(s: Session, input: readonly PromptInput[], clientRequestI
         ...pres,
       } as ThreadDelta,
     ]);
+    if (!r.isError) echoed.push(...directiveLines(r.content.split(/\r?\n/)));
     toolReport.push(`- ${force ? "FORCECALL" : "CALL"} ${name}${s.tools.has(name) ? "" : " (not offered; forced)"}: ${r.isError ? "ERROR" : "ok"} → ${r.content.replace(/\s+/g, " ").slice(0, 400)}`);
   }
 
-  const directives = lines.filter((l) => /^\s*::[a-z]/.test(l)).map((l) => l.trim());
+  const directives = [...directiveLines(lines), ...echoed];
   const skillNames = skillRoots === null ? null : skillRoots.flatMap((r) => r.skills);
   const text = [
+    ...directives.flatMap((d) => [d, ""]),
     `**Scripted provider report** (turn ${t}, thread \`${s.threadId}\`)`,
     "",
     `- dynamic tools offered: ${s.tools.size === 0 ? "(none)" : [...s.tools.keys()].map((n) => `\`${n}\``).join(", ")}`,
     `- skills offered (skills/configure${skillsConfiguredAt ? ` @ ${skillsConfiguredAt}` : ""}): ${skillNames === null ? "(never configured)" : skillNames.length === 0 ? "(none)" : skillNames.map((n) => `\`${n}\``).join(", ")}`,
     ...(toolReport.length === 0 ? [] : ["", "Tool calls:", ...toolReport]),
-    ...(directives.length === 0 ? [] : ["", ...directives]),
   ].join("\n");
   record({ event: "turn", threadId: s.threadId, turn: t, tools: [...s.tools.keys()], skills: skillNames, toolReport, directives });
 
@@ -203,7 +214,7 @@ const handlers: Record<string, (id: JsonRpcId, params: unknown) => void> = {
         threadArchive: false,
         threadRename: false,
         threadGoalClear: false,
-        fork: "none",
+        fork: "tip",
         approvalEnforcedBy: "runtime",
         steerMode: "queue",
         skills: { configure: true },
@@ -274,6 +285,21 @@ const handlers: Record<string, (id: JsonRpcId, params: unknown) => void> = {
       dynamicTools: p.data.dynamicTools,
     });
     io.sendResult(id, { providerThreadId: p.data.providerThreadId, sessionRestorable: true });
+  },
+  // A fork (a BB side chat) starts a fresh session: the script has no history to copy.
+  [BRIDGE_REQUEST_METHODS.threadFork]: (id, params) => {
+    const p = threadForkParamsSchema.safeParse(params);
+    if (!p.success) return invalid(id, "thread/fork", p.error.issues);
+    counter += 1;
+    const providerThreadId = `scripted_${nonce}_${counter}`;
+    openSession({
+      threadId: p.data.threadId,
+      providerThreadId,
+      cwd: p.data.cwd,
+      dynamicTools: p.data.dynamicTools,
+    });
+    record({ event: "fork", threadId: p.data.threadId, source: p.data.sourceProviderThreadId });
+    io.sendResult(id, { providerThreadId, sessionRestorable: true });
   },
   [BRIDGE_REQUEST_METHODS.turnStart]: (id, params) => {
     const p = turnStartParamsSchema.safeParse(params);

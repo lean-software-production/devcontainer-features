@@ -16,6 +16,8 @@ Installs the OpenAI Codex coding-agent CLI. Add a Node.js Feature or use a Node.
 | Options Id | Description | Type | Default Value |
 |-----|-----|-----|-----|
 | version | Codex CLI version to install. 'latest' is the rolling default; use an exact version for reproducible containers. | string | latest |
+| model | Default Codex model, written to the system config /etc/codex/config.toml. Users can still override it in ~/.codex/config.toml or with --model. Empty leaves Codex's upstream default. | string | - |
+| fullAccess | Default Codex to Full Access (no sandbox, never ask for approval), written to /etc/codex/config.toml. Only suitable for disposable containers; users can still override it in ~/.codex/config.toml or with /permissions. | boolean | false |
 
 ## Requirements
 
@@ -29,6 +31,40 @@ package currently provides Linux x64 and arm64 distributions.
 The default tracks the rolling npm `latest` release of the official
 `@openai/codex` package. Set `"version"` to an exact release such as `0.155.1`
 when reproducible builds are required.
+
+## Default model
+
+Set `"model"` to make a model the default for every Codex session in the
+container:
+
+```json
+"features": {
+  "ghcr.io/lean-software-production/devcontainer-features/codex:1": {
+    "model": "gpt-6-sol"
+  }
+}
+```
+
+The Feature writes it to the system config layer, `/etc/codex/config.toml`, so
+the remote user's own `~/.codex/config.toml`, `/model`, or `--model` still take
+precedence. Leave it empty to keep Codex's upstream default. `codex doctor`
+shows the effective model.
+
+## Full access
+
+Set `"fullAccess": true` to default Codex to its Full Access permissions — no
+sandbox and no approval prompts:
+
+```toml
+sandbox_mode = "danger-full-access"
+approval_policy = "never"
+```
+
+These are written to `/etc/codex/config.toml` alongside `model`, so users can
+still choose a safer mode with `/permissions` or `~/.codex/config.toml`. Only
+enable this in disposable containers: Codex will run any command, with network
+access, using whatever credentials the container holds (for example a
+Codespace's `GITHUB_TOKEN`) without asking.
 
 ## First run and authentication
 

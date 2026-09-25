@@ -4,6 +4,39 @@ This log covers the MVP build, made while the owner was away. It records every p
 build diverges from [`DESIGN.md`](DESIGN.md) as reviewed in PR #4, and why. Entries are
 newest-first.
 
+## Review rounds (2026-09-25)
+
+Three Codex (gpt-6-sol) reviewers covered the backend, the feature packaging and the UI, and found
+19 defects. All were fixed with red-then-green tests. A fourth Codex pass verified the fixes
+independently by reverting each one: 14 were confirmed, 4 were partial, and it found 5 new small
+issues. Four of the partial fixes and four of the new issues were closed in round 2.
+Behaviour-visible changes:
+
+- **Symbolic links never lead outside their folder.** Tutor refuses to adopt, seed or write
+  progress through a symlinked `spec/`, `seeds/` or seed file (a dangling seed link included). It
+  refuses a course whose `course.yaml`, ledger, homework folders, coach or lexicon are symlinks
+  leading outside the course.
+- **The course checkout can't be chosen as the factory.** Neither can a folder inside it or one
+  holding it. First run marks such projects "shares a folder with the course".
+- **A homework needs `README.md` and at least one `.feature` file.** `FACTORY.md` and `spec.md`
+  are optional. A homework without feature files is a course load error and can never be adopted.
+- **Concurrency.** Progress mutations and "find or spawn the main coach" are serialised per
+  factory / homework with an in-process lock (BB runs one server process).
+- **`PROGRESS.yaml` never loses what it doesn't understand.** Unknown fields survive, including
+  when a homework moves into `history`. Malformed history is reported and written back verbatim.
+- **Pages revalidate their data on mount.** A 3-second sharing window deliberately lets the rail,
+  the page and the nav badge share one request. The reviewer's "a remount within 3 s shows cached
+  data" was rejected as the intended trade-off.
+- **The rail's "Start with your coach" opens the lesson.** While no factory is bound, coach
+  actions lead to the welcome page. While the binding is still loading, none is offered.
+- **Rule links carry the Rule in the URL** (`lesson/NNN/<feature>/<rule>`), so they survive a new
+  tab or a reload.
+- **Word spaces render in the fallback sans face.** Archivo's own space is very narrow in some
+  renderers.
+- **The start-up script checks the plugin's status, not just its install path.** A disabled
+  plugin is left off; a failed one is reloaded, and the script fails if it stays down. The
+  plugin copy's digest includes the built bundle, so a bb-app upgrade restages it.
+
 ## Build (2026-09-25)
 
 Judgement calls the four builders made that change user-visible behaviour or the design's

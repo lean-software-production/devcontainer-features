@@ -1,6 +1,6 @@
 {
   "id": "codex",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "OpenAI Codex CLI",
   "description": "Installs the OpenAI Codex coding-agent CLI. Add a Node.js Feature or use a Node.js base image; this Feature does not install Node.js.",
   "documentationURL": "https://github.com/lean-software-production/devcontainer-features/tree/main/src/codex",
@@ -16,6 +16,20 @@
       ],
       "default": "latest",
       "description": "Codex CLI version to install. 'latest' is the rolling default; use an exact version for reproducible containers."
+    },
+    "model": {
+      "type": "string",
+      "proposals": [
+        "",
+        "gpt-6-sol"
+      ],
+      "default": "",
+      "description": "Default Codex model, written to the system config /etc/codex/config.toml. Users can still override it in ~/.codex/config.toml or with --model. Empty leaves Codex's upstream default."
+    },
+    "fullAccess": {
+      "type": "boolean",
+      "default": false,
+      "description": "Default Codex to Full Access (no sandbox, never ask for approval), written to /etc/codex/config.toml. Only suitable for disposable containers; users can still override it in ~/.codex/config.toml or with /permissions."
     }
   }
 }

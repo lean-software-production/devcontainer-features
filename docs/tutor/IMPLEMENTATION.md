@@ -311,7 +311,8 @@ not data.
   `app/rule-jump.ts`): open the coach thread, then look for the anchor in the scroller holding the
   thread's timeline rows (`[data-timeline-row-id^="<thread>:"]` and their scrollable ancestor, never
   BB's hashed classes). While it is missing, scroll that timeline to its top so BB loads older
-  history, until the anchor appears, the history stops growing, or 20 s pass. Then
+  history, until the anchor appears, 20 s pass, or it has scrolled to the top 40 times (an
+  unchanged height doesn't stop it: BB can show its loading row for seconds). Then
   `scrollIntoView({ block: "start" })` and a brief highlight. Leaving the thread or scrolling by
   hand cancels it; not finding it is a toast, never an error.
 - **Lost connection:** `useTutorRpc` turns a response that is not one of BB's JSON errors (for

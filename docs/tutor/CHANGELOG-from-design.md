@@ -30,6 +30,11 @@ a regression test that failed before it and passes after.
   inside `spec/` first (README.md required, FACTORY.md optional) and swapped in only when all of it
   copied; the old files move aside during the swap and come back if it fails. The symbolic-link
   refusals for `spec/`, `seeds/` and the seed are unchanged.
+- **T4: the jump to a Rule waits for a slow page.** The search gave up after three loads in a row
+  left the timeline's height unchanged, under 3 s in, although BB can show its loading row for
+  longer before an older page arrives, so an early Rule was reported "Couldn't find" well within
+  the 20 s it was meant to try. Now only the 20 s deadline and a cap of 40 scrolls to the top end
+  the search; the history height is no longer read.
 
 ## Names follow the glossary (2026-09-25)
 

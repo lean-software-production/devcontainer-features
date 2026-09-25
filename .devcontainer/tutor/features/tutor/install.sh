@@ -91,8 +91,9 @@ chmod -R u+rwX,go+rX,go-w "$PLUGIN_DIR" "$TOOLCHAIN_DIR"
 # The Feature content arrives with every file executable; plugin sources are data.
 find "$PLUGIN_DIR" -path "$PLUGIN_DIR/node_modules" -prune -o -type f -exec chmod 0644 {} +
 # The start-up hook stages a user-owned copy per plugin build (a path install
-# rewrites dist/), keyed by this digest of everything but the derived trees.
-(cd "$PLUGIN_DIR" && find . \( -path ./node_modules -o -path ./dist \) -prune -o -type f -print0 \
+# rewrites dist/), keyed by this digest. dist/ is included so that a new bb-app
+# producing a different bundle from the same sources still gets a fresh copy.
+(cd "$PLUGIN_DIR" && find . -path ./node_modules -prune -o -type f -print0 \
     | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1) > "$SHARE_DIR/plugin.sha256"
 
 # The plugin reads course/factory from this JSON; the hooks read options.tsv.

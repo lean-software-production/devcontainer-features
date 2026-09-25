@@ -4,7 +4,7 @@
     "remoteUser": "node",
     "features": {
       "bb": {
-        "version": "0.43.3",
+        "version": "0.43.4",
         "mode": "standalone",
         "autoStart": true,
         "serverPort": "48186",
@@ -19,7 +19,7 @@
     "remoteUser": "node",
     "features": {
       "bb": {
-        "version": "0.43.3",
+        "version": "0.43.4",
         "mode": "standalone",
         "autoStart": true,
         "serverPort": "48286",

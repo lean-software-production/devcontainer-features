@@ -21,7 +21,7 @@ unreviewed scripts; npm 12 blocks unapproved scripts. The scoped flag also
 avoids npm 11's "not yet covered by allowScripts" warning for the reviewed
 addons. npm before 11.16 uses its normal script behavior without this flag.
 
-BB's upstream source is MIT licensed. Because the 0.43.3 npm manifest omits
+BB's upstream source is MIT licensed. Because the 0.43.4 npm manifest omits
 its license field, the Feature installs the upstream notice at
 `/usr/local/share/bb/NOTICE`; the source copy is [NOTICE](NOTICE).
 

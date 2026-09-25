@@ -4,7 +4,7 @@
 # user state.
 set -euo pipefail
 
-BB_VERSION="${VERSION:-0.43.3}"
+BB_VERSION="${VERSION:-0.43.4}"
 BB_MODE="${MODE:-cli}"
 BB_AUTOSTART="${AUTOSTART:-false}"
 BB_SERVER_PORT="${SERVERPORT:-38886}"
@@ -86,7 +86,7 @@ actual_integrity="$(node -e 'const fs=require("fs"),crypto=require("crypto"); pr
 # Scope script permission to this one install. npm 11.16 introduced the
 # allow-scripts flag and warns about unreviewed scripts; npm 12 blocks them.
 # https://github.com/npm/cli/blob/v11.16.0/CHANGELOG.md
-# BB 0.43.3 needs the reviewed native-addon hooks of node-pty and
+# BB 0.43.4 needs the reviewed native-addon hooks of node-pty and
 # @parcel/watcher; do not use npm's
 # global "allow all" escape hatch or write an npmrc policy. npm before 11.16
 # does not implement --allow-scripts and retains normal script behavior.

@@ -28,7 +28,7 @@ directory for local validation. Add `/.bb-state/` to the consumer repository's
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `version` | string | `0.43.3` | Exact bb-app semver, or explicit `latest`. `latest` is resolved at image build, never at startup. |
+| `version` | string | `0.43.4` | Exact bb-app semver, or explicit `latest`. `latest` is resolved at image build, never at startup. |
 | `mode` | `cli` / `standalone` | `cli` | CLI only, or the user-owned standalone server lifecycle. |
 | `autoStart` | boolean | `false` | Start standalone BB on each container start. Has no effect in CLI mode. |
 | `serverPort` | string | `38886` | Server loopback port, 1024-65535. |
@@ -37,7 +37,7 @@ directory for local validation. Add `/.bb-state/` to the consumer repository's
 | `appUrl` | string | `auto` | Explicit HTTP(S) browser origin, or an origin derived from Codespaces variables. |
 
 Node is intentionally composable: supply it through the base image or Node
-Feature. BB 0.43.3 requires Node `^22.19.0`, `^24`, or `^26`. This Feature is
+Feature. BB 0.43.4 requires Node `^22.19.0`, `^24`, or `^26`. This Feature is
 implemented and tested for Debian/Ubuntu Linux amd64. It does not claim arm64
 validation.
 

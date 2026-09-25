@@ -10,8 +10,8 @@
   "options": {
     "version": {
       "type": "string",
-      "proposals": ["0.43.3", "latest"],
-      "default": "0.43.3",
+      "proposals": ["0.43.4", "latest"],
+      "default": "0.43.4",
       "description": "bb-app version to install. Use an exact version for reproducible builds; 'latest' is explicitly allowed but resolved only while building the image."
     },
     "mode": {

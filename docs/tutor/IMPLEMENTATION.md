@@ -122,7 +122,7 @@ imports only that file. `loadCourse(coursePath)` works as follows:
    `description`, `coach`, optional `lexicon`, and `lessons[]` with `{ id, title, set, dir }`.
 2. **Otherwise the ledger fallback.** Parse the table in `docs/iterations/README.md`: the
    `Iteration` column is the id, the `Spec` link text is the title and its target's directory is
-   `dir`, and `Set after` is `set`. Then `id` is `slugify(basename(coursePath))`, `title` is the
+   `dir`, and the optional `Set after` column is `set`. Then `id` is `slugify(basename(coursePath))`, `title` is the
    course README's first `#` heading (or the id), `description` is null, `coach` is
    `.agents/coach-me.md` if it exists, and `lexicon` is `docs/lexicon.yaml` if it exists.
 3. **Lesson 0** ("Using your tutor", id `000`, set `Start here`, `builtin: true`) comes first. Its

@@ -163,6 +163,48 @@ for _ in $(seq 1 100); do kill -0 "$session_pid" 2>/dev/null || break; sleep .1;
 rm "$session_state/.bb-feature/launcher.tsv"
 echo 'BB survives lifecycle session cleanup with its real PID; cleanup is bounded'
 
+# A status check that lands while autostart holds the lifecycle lock but has not
+# yet recorded its launcher must wait for that start, not report "not ready".
+# The fixture gates autostart after BB is listening and before the record is
+# written (at the PID-handoff cleanup), so the race is hit every run.
+gated_state="$fixture/gated-start"
+start_gate="$fixture/start-gate"
+mkdir "$gated_state" "$fixture/gated-rm"
+cat > "$fixture/gated-rm/rm" <<'GATED_RM'
+#!/usr/bin/env bash
+case "$*" in *launcher-start.*) while [ -e "$BB_TEST_START_GATE" ]; do sleep .05; done;; esac
+exec /bin/rm "$@"
+GATED_RM
+chmod 755 "$fixture/gated-rm/rm"
+write_options 49986 49987 https://bb.example.test "$gated_state"
+HOME="$fixture/home" "$share/bin/bb-feature-bootstrap"
+touch "$start_gate"
+PATH="$fixture/gated-rm:$PATH" BB_TEST_START_GATE="$start_gate" HOME="$fixture/home" "$share/bin/bb-feature-autostart" & gated=$!
+for _ in $(seq 1 100); do
+  curl --fail --silent --max-time 1 http://127.0.0.1:49986/health >/dev/null 2>&1 && break
+  sleep .1
+done
+curl --fail --silent --max-time 1 http://127.0.0.1:49986/health >/dev/null
+test ! -e "$gated_state/.bb-feature/launcher.tsv"
+kill -0 "$gated"
+HOME="$fixture/home" "$share/bin/bb-feature-status" & gated_status=$!
+sleep 1
+kill -0 "$gated_status" || { echo 'status returned while autostart was still recording its launcher' >&2; exit 1; }
+test ! -e "$gated_state/.bb-feature/launcher.tsv"
+rm "$start_gate"
+wait "$gated"
+wait "$gated_status"
+gated_pid="$(awk -F '\t' '$1=="PID"{print $2}' "$gated_state/.bb-feature/launcher.tsv")"
+kill -TERM "$gated_pid"
+for _ in $(seq 1 100); do kill -0 "$gated_pid" 2>/dev/null || break; sleep .1; done
+kill -0 "$gated_pid" 2>/dev/null && { echo 'gated fixture launcher did not exit' >&2; exit 1; }
+rm "$gated_state/.bb-feature/launcher.tsv"
+# With no launcher and no autostart holding the lock, status still fails fast.
+started=$SECONDS
+if timeout 5 env HOME="$fixture/home" "$share/bin/bb-feature-status"; then echo 'status accepted a missing launcher' >&2; exit 1; fi
+test $((SECONDS - started)) -le 2
+echo 'status waits for an in-progress autostart that has not recorded its launcher'
+
 write_options 49386 49387 https://bb.example.test "$state"
 HOME="$fixture/home" "$share/bin/bb-feature-bootstrap"
 grep -F 'https://bb.example.test' "$state/config.json"

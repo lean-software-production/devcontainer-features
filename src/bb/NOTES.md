@@ -79,8 +79,11 @@ both server `/health` and a TCP connection to the configured loopback host-daemo
 port. The same readiness rule applies to an existing launcher and to status;
 a healthy HTTP server alone is not sufficient. After verifying its launcher is
 owned and alive, status retries for 8 seconds (plus a bounded final probe) to
-tolerate transient startup/plugin load. Status never restarts or signals the
-launcher; it fails if either service remains unavailable. Autostart refuses a healthy port
+tolerate transient startup/plugin load. If no owned launcher is recorded yet
+but an autostart holds the lifecycle lock, status first waits up to 45 seconds
+for that start to finish; with no lock holder it fails at once. Status never
+restarts or signals the launcher, and never creates the lock or the runtime
+record; it fails if either service remains unavailable. Autostart refuses a healthy port
 owned by anything else, never kills by port number, and never deletes BB's own
 locks. Logs and Feature-owned runtime metadata live under
 `<dataDir>/.bb-feature/`; use `bb-feature-status` for a concise health result.

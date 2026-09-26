@@ -2,9 +2,11 @@
 
 Adds the Tutor BB plugin to the [bb Feature](../bb)'s standalone server: a
 course outline in the sidebar and a coach thread per lesson that works one
-Gherkin Rule at a time. The plugin is prebuilt while the image is
-built and path-installed into BB each time the container starts; nothing is
-fetched at start-up except the optional course and starter clones. On first
+Gherkin Rule at a time. The plugin, from
+[bb-plugin-tutor](https://github.com/lean-software-production/bb-plugin-tutor),
+is downloaded as a pinned, checksummed release and prebuilt while the image
+is built, then path-installed into BB each time the container starts; nothing
+is fetched at start-up except the optional course and starter clones. On first
 start it also brands BB with the Tutor paper theme and switches off BB plugins
 a student does not need; a student can undo either.
 
@@ -48,6 +50,8 @@ which composes local copies of both Features.
 | `selectOutline` | boolean | `true` | Select the course outline as BB's sidebar thread list once, unless another thread list was chosen already. |
 | `disablePlugins` | string | `automations,workflows,tasks,scheduled-send,github,browser-automation,agent-annotations,connect,plugin-api-docs,plugin-api-tester,theme-preview,keep-awake,account-pool,environment-modal-sandbox` | Comma-separated BB plugin ids to switch off once per BB state directory; a student can turn any back on. Missing plugins are skipped. `tutor`, `thread-list`, `provider-*` and the workspace environments are never switched off. Empty switches off nothing. |
 | `theme` | string | `plugin:tutor:paper` | BB theme to select once per BB state directory, only while BB's default theme is active. Empty leaves the theme alone. |
+| `pluginVersion` | string | `0.1.0` | [bb-plugin-tutor](https://github.com/lean-software-production/bb-plugin-tutor) release to download at image build, as a plain semantic version (no `v` prefix or range). The default is the release this Feature version pins, verified against its pinned SHA-256; any other version needs `pluginSha256`. |
+| `pluginSha256` | string | empty | SHA-256 (64 lower-case hex digits) of `bb-plugin-tutor-<pluginVersion>.tgz`. Required when `pluginVersion` is not the pinned default; with the default it must be empty or equal the pin. The release's own `.sha256` file is never trusted. |
 
 The Feature also installs `tutor-keepalive`, which keeps a GitHub Codespace
 awake while the student uses BB. It is not a lifecycle command of the Feature,
@@ -60,7 +64,9 @@ because it runs until its terminal closes and would hold up any
 ```
 
 Requires the bb Feature in `standalone` mode, installed first, on the Linux
-amd64 Debian/Ubuntu Node.js images the bb Feature supports.
+amd64 Debian/Ubuntu Node.js images the bb Feature supports, with `curl`. The
+image build needs HTTPS access to `github.com` for the plugin release, as
+well as to the npm registry.
 
 See [NOTES.md](NOTES.md) for the lifecycle, security model, local composition
 and limitations.

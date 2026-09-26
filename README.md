@@ -74,7 +74,9 @@ for security, persistence, provider-login, and live acceptance boundaries.
 
 [`tutor`](src/tutor) adds the Tutor BB plugin to a standalone `bb` Feature: a
 course outline, lesson cards, and a coach that works one Gherkin Rule at a time.
-It prebuilds the plugin at image build, clones the course (by default the
+It downloads a pinned, checksummed release of the plugin from
+[bb-plugin-tutor](https://github.com/lean-software-production/bb-plugin-tutor)
+and prebuilds it at image build, clones the course (by default the
 public [tutorial](https://github.com/lean-software-production/tutorial)) after
 creation, and path-installs the plugin into BB on each start. Install `bb`
 first: until `bb` is published, list both in `overrideFeatureInstallOrder`.

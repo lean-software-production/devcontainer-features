@@ -28,33 +28,98 @@ once bb is published. It will still not order a *local* bb, because
 `installsAfter` only matches Features of the same kind, so local
 compositions keep the override.
 
+## Where the plugin comes from
+
+The Feature carries no plugin source. At image build it downloads one release
+of [bb-plugin-tutor](https://github.com/lean-software-production/bb-plugin-tutor):
+
+```
+https://github.com/lean-software-production/bb-plugin-tutor/releases/download/v<pluginVersion>/bb-plugin-tutor-<pluginVersion>.tgz
+```
+
+a gzip tar with one top-level directory `bb-plugin-tutor-<pluginVersion>/`
+holding `package.json`, `package-lock.json` and the sources (no `dist/`, no
+`node_modules`).
+
+**Pinning.** Each Feature version pins one plugin release and its SHA-256 in
+[`plugin-pin.sh`](plugin-pin.sh), the only place either is recorded (the
+`pluginVersion` default in `devcontainer-feature.json` must name the same
+version; `test/tutor/plugin-fetch-hermetic.sh` checks that). With the default
+`pluginVersion` the download is verified against that pinned SHA-256, and a
+`pluginSha256` given as well must equal it: a build fails rather than guess
+which of two checksums was meant. The release also publishes a `.sha256`
+file; the Feature never reads it, since anyone able to replace the tarball
+could replace that too.
+
+**Using a newer plugin release** without waiting for a new Feature version:
+compute the tarball's SHA-256 yourself and set both options.
+
+```sh
+v=0.2.0
+curl -fsSLO "https://github.com/lean-software-production/bb-plugin-tutor/releases/download/v$v/bb-plugin-tutor-$v.tgz"
+sha256sum "bb-plugin-tutor-$v.tgz"
+```
+
+```jsonc
+"ghcr.io/lean-software-production/devcontainer-features/tutor:0": {
+  "pluginVersion": "0.2.0",
+  "pluginSha256": "<the 64 hex digits sha256sum printed>"
+}
+```
+
+`pluginSha256` is required whenever `pluginVersion` is not the pinned one.
+The plugin must still suit the bb version the bb Feature installs and read
+`config.json` schema version 1.
+
+**Network.** The image build needs HTTPS access to `github.com` (release
+downloads redirect to `objects.githubusercontent.com`), as well as to the npm
+registry for `npm ci` and bb's plugin build toolchain. Nothing is downloaded
+when the container starts, apart from the optional course and starter clones.
+
 ## Image build (`install.sh`, root)
 
 1. Validates the options: absolute paths without dot segments, quotes, control
    characters or shell metacharacters; `factory` and `starter` each different
    from `course`; `courseRepo` and `starterRepo` empty or an `https://` URL
    without credentials, query or fragment; `starterRepo` only with a
-   `starter`.
+   `starter`; `pluginVersion` a plain semantic version (`MAJOR.MINOR.PATCH`
+   with an optional pre-release; no `v` prefix, range or build metadata);
+   `pluginSha256` empty or 64 lower-case hex digits, required for any
+   `pluginVersion` but the pinned one and equal to the pin for that one.
 2. Checks that the bb Feature is installed in `standalone` mode.
-3. Stages the plugin at `/usr/local/share/tutor/plugin`, root-owned and not
+3. Downloads the plugin release with `curl` (HTTPS and TLS 1.2 or later only,
+   redirects included, with retries) and checks its SHA-256 before reading
+   it. It then lists the archive and refuses any member that is absolute, has
+   a `..` (or empty or `.`) segment, lies outside `bb-plugin-tutor-<version>/`,
+   is a symlink whose target is absolute or contains `..`, is a hard link
+   outside that directory, is not a plain file, directory or link, or has a
+   name with control characters, quotes or backslashes. Only then does it
+   extract, without the archive's owners or modes, and check that
+   `package.json` names `bb-plugin-tutor` at `pluginVersion`, that
+   `package-lock.json` exists, and that there is no `dist/` or
+   `node_modules`. The logic is in `bin/tutor-plugin-fetch.sh`, used only at
+   build time.
+4. Stages the plugin at `/usr/local/share/tutor/plugin`, root-owned and not
    writable by the learner, runs `npm ci --omit=dev --ignore-scripts` (bb
    shims the SDK and UI packages for plugins, so only runtime dependencies
    are needed), and runs `bb plugin build` with the bb Feature's packaged CLI.
-4. bb downloads its plugin build toolchain (esbuild, Tailwind) on first use
+5. bb downloads its plugin build toolchain (esbuild, Tailwind) on first use
    into `<dataDir>/plugins/toolchain-<pins>`. The build runs against a
    throwaway state directory and the toolchain is kept at
    `/usr/local/share/tutor/toolchain`, so no start-up needs the network.
-5. Writes `/usr/local/etc/tutor/config.json` (`{ "course", "factory",
-   "dataDir" }`, the contract the plugin reads; `factory` is omitted when
+6. Writes `/usr/local/etc/tutor/config.json` (`{ "schemaVersion": 1,
+   "course", "factory", "dataDir" }`, the contract the plugin reads; the
+   plugin treats a missing `schemaVersion` as 1 and refuses any other;
+   `factory` is omitted when
    empty, and `starter` is not part of it, because the plugin finds the
    codebase from the factory) and `/usr/local/share/tutor/options.tsv` (for
    the hooks), both root-owned 0644, plus `plugin.sha256`, a digest of the
-   staged plugin without `node_modules` and `dist`. `dataDir` is the BB state
+   staged plugin, including the built `dist/` but not `node_modules`. `dataDir` is the BB state
    directory the hooks use: the bb Feature's `dataDir`, or `<remote user's
    home>/.bb` when that is empty (from `_REMOTE_USER_HOME`; omitted if the
    home is unknown). The plugin writes the keep-alive's activity file beneath
    it.
-6. Validates `disablePlugins` (comma-separated ids of lower-case letters,
+7. Validates `disablePlugins` (comma-separated ids of lower-case letters,
    digits and `-`) and `theme` (a theme id such as `plugin:tutor:paper`), and
    warns about any listed plugin Tutor needs.
 
@@ -179,7 +244,9 @@ and checked in CI with `--check`. See
 CI runs:
 
 - the Feature scenarios in [`test/tutor`](../../test/tutor):
-  - `standalone`: prebuilt, root-owned plugin with runtime dependencies only;
+  - `standalone`: the pinned plugin release downloaded and verified (so the
+    scenarios need that release published and its SHA-256 pinned), prebuilt,
+    root-owned, with runtime dependencies only; `config.json`'s schema version;
     course cloned; plugin running from its digest copy; toolchain seeded, not
     downloaded; projects and outline; idempotent restarts; the student's outline
     choice kept; `config.json`'s `dataDir`; the unneeded plugins switched off
@@ -194,6 +261,11 @@ CI runs:
 - hermetic tests of the option validation and of every hook decision against
   a fake bb CLI, including the keep-alive's freshness window and single
   instance;
+- a hermetic test of the plugin download (`plugin-fetch-hermetic.sh`): a fake
+  `curl` serves crafted tarballs, and a wrong checksum (which must extract
+  nothing), a wrong top-level directory, `..`, absolute and escaping-link
+  members, a mismatched `package.json`, a missing lockfile, a bundled `dist/`
+  and a failed download are each refused;
 - a bring-up of the Codespace entry point itself (`codespace-entry.sh`, on
   ports 48886/48887 and with `/workspaces` paths moved under the home
   directory), including the starter clone and its factory registered as

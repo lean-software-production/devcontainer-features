@@ -52,6 +52,24 @@ expect_reject 'empty item in disablePlugins' 'disablePlugins must be' DISABLEPLU
 expect_reject 'space in disablePlugins' 'disablePlugins must be' DISABLEPLUGINS='automations, workflows'
 expect_reject 'shell injection in theme' 'theme must be' THEME='plugin:tutor:paper;touch pwned'
 expect_reject 'space in theme' 'theme must be' THEME='my theme'
+sha="$(printf '%064d' 7)"
+expect_reject "a 'v' prefix in pluginVersion" 'pluginVersion must be' PLUGINVERSION=v0.1.0 PLUGINSHA256="$sha"
+expect_reject 'a range in pluginVersion' 'pluginVersion must be' PLUGINVERSION='^0.1.0' PLUGINSHA256="$sha"
+expect_reject 'a partial pluginVersion' 'pluginVersion must be' PLUGINVERSION=0.1 PLUGINSHA256="$sha"
+expect_reject 'a leading zero in pluginVersion' 'pluginVersion must be' PLUGINVERSION=0.01.0 PLUGINSHA256="$sha"
+expect_reject 'build metadata in pluginVersion' 'pluginVersion must be' PLUGINVERSION=0.1.0+build.1 PLUGINSHA256="$sha"
+expect_reject 'an empty pluginVersion' 'pluginVersion must be' PLUGINVERSION=
+expect_reject 'shell injection in pluginVersion' 'pluginVersion must be' PLUGINVERSION='0.1.0;touch pwned' PLUGINSHA256="$sha"
+# shellcheck disable=SC2016 # the literal text is the attack
+expect_reject 'command substitution in pluginVersion' 'pluginVersion must be' PLUGINVERSION='0.1.0-$(id)' PLUGINSHA256="$sha"
+expect_reject 'a path in pluginVersion' 'pluginVersion must be' PLUGINVERSION=../0.1.0 PLUGINSHA256="$sha"
+expect_reject 'a newline in pluginVersion' 'pluginVersion must be' PLUGINVERSION=$'0.1.0\n0.2.0' PLUGINSHA256="$sha"
+expect_reject 'an upper-case pluginSha256' 'pluginSha256 must be' PLUGINVERSION=0.2.0 PLUGINSHA256="$(printf 'A%063d' 0)"
+expect_reject 'a short pluginSha256' 'pluginSha256 must be' PLUGINVERSION=0.2.0 PLUGINSHA256="${sha:1}"
+expect_reject 'a non-hex pluginSha256' 'pluginSha256 must be' PLUGINVERSION=0.2.0 PLUGINSHA256="g${sha:1}"
+expect_reject 'shell injection in pluginSha256' 'pluginSha256 must be' PLUGINVERSION=0.2.0 PLUGINSHA256="${sha:10};touch pwned"
+expect_reject 'another pluginVersion without pluginSha256' 'pluginSha256 is required' PLUGINVERSION=0.2.0
+expect_reject 'a pluginSha256 that differs from the pin' "differs from this Feature's pinned SHA-256" PLUGINSHA256="$sha"
 test ! -e "$tmp/pwned"
 test ! -e pwned
 
@@ -65,4 +83,8 @@ expect_reject 'the starter layout without the bb Feature' 'the bb Feature must b
     FACTORY=/workspaces/capstone-project-starter/tetris/.factory
 expect_reject 'plugin list and theme without the bb Feature' 'the bb Feature must be installed first' \
     DISABLEPLUGINS=automations,tutor,provider-codex THEME=nord
+expect_reject 'another plugin release without the bb Feature' 'the bb Feature must be installed first' \
+    PLUGINVERSION=0.2.0-rc.1 PLUGINSHA256="$sha"
+expect_reject 'the pinned plugin release, explicitly, without the bb Feature' 'the bb Feature must be installed first' \
+    PLUGINVERSION="$(sed -n 's/^TUTOR_PLUGIN_PINNED_VERSION=//p' "$repo_root/src/tutor/plugin-pin.sh")" PLUGINSHA256=
 echo 'tutor adversarial option validation passed'

@@ -1,8 +1,8 @@
 {
   "id": "tutor",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "name": "Tutor coached course for BB",
-  "description": "Adds the Tutor BB plugin to the bb Feature's standalone server: a course outline in the sidebar and a coach thread per lesson that works one Gherkin Rule at a time. Requires the bb Feature in standalone mode.",
+  "description": "Adds the Tutor BB plugin (a pinned, checksummed bb-plugin-tutor release) to the bb Feature's standalone server: a course outline in the sidebar and a coach thread per lesson that works one Gherkin Rule at a time. Requires the bb Feature in standalone mode.",
   "documentationURL": "https://github.com/lean-software-production/devcontainer-features/tree/main/src/tutor",
   "options": {
     "course": {
@@ -51,6 +51,16 @@
       "proposals": ["plugin:tutor:paper", ""],
       "default": "plugin:tutor:paper",
       "description": "BB theme id to select once per BB state directory, only while BB's default theme is active. Empty leaves BB's theme alone."
+    },
+    "pluginVersion": {
+      "type": "string",
+      "default": "0.1.0",
+      "description": "bb-plugin-tutor release downloaded from GitHub at image build, as a plain semantic version (no 'v' prefix or range). The default is the release this Feature pins, verified against its pinned SHA-256; any other version needs pluginSha256."
+    },
+    "pluginSha256": {
+      "type": "string",
+      "default": "",
+      "description": "SHA-256 (64 lower-case hex digits) of bb-plugin-tutor-<pluginVersion>.tgz. Required when pluginVersion is not the pinned default; with the default it must be empty or equal the pin. The release's own .sha256 file is never trusted."
     }
   },
   "postCreateCommand": "/usr/local/share/tutor/bin/tutor-feature-bootstrap",

@@ -56,6 +56,9 @@ jobs:
       - name: Test Tutor option rejection
         run: bash test/tutor/adversarial-options.sh
 
+      - name: Test the Tutor plugin download checks
+        run: bash test/tutor/plugin-fetch-hermetic.sh
+
       - name: Test Tutor lifecycle hooks
         run: sudo bash test/tutor/lifecycle-hermetic.sh
 

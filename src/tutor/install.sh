@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
 # shellcheck source-path=SCRIPTDIR
 # Dev Container Feature installer for Tutor. This runs as root while the image
-# is built, after the bb Feature. It stages and prebuilds the plugin so that
-# nothing is fetched when the container starts; it never starts BB or creates
-# user state.
+# is built, after the bb Feature. It downloads a pinned, checksummed release of
+# the plugin (lean-software-production/bb-plugin-tutor) and prebuilds it so
+# that nothing is fetched when the container starts; it never starts BB or
+# creates user state.
 set -euo pipefail
+
+FEATURE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The default plugin release and its SHA-256 live in plugin-pin.sh.
+# shellcheck source=plugin-pin.sh
+. "$FEATURE_DIR/plugin-pin.sh"
+# shellcheck source=bin/tutor-plugin-fetch.sh
+. "$FEATURE_DIR/bin/tutor-plugin-fetch.sh"
 
 TUTOR_COURSE="${COURSE-/workspaces/tutorial}"
 TUTOR_COURSE_REPO="${COURSEREPO-https://github.com/lean-software-production/tutorial.git}"
@@ -14,8 +22,9 @@ TUTOR_FACTORY="${FACTORY-}"
 TUTOR_SELECT_OUTLINE="${SELECTOUTLINE:-true}"
 TUTOR_DISABLE_PLUGINS="${DISABLEPLUGINS-automations,workflows,tasks,scheduled-send,github,browser-automation,agent-annotations,connect,plugin-api-docs,plugin-api-tester,theme-preview,keep-awake,account-pool,environment-modal-sandbox}"
 TUTOR_THEME="${THEME-plugin:tutor:paper}"
+TUTOR_PLUGIN_VERSION="${PLUGINVERSION-$TUTOR_PLUGIN_PINNED_VERSION}"
+TUTOR_PLUGIN_SHA256="${PLUGINSHA256-}"
 
-FEATURE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SHARE_DIR=/usr/local/share/tutor
 PLUGIN_DIR="$SHARE_DIR/plugin"
 TOOLCHAIN_DIR="$SHARE_DIR/toolchain"
@@ -64,6 +73,22 @@ check_repo_text() {
 check_repo_text courseRepo "$TUTOR_COURSE_REPO"
 check_repo_text starterRepo "$TUTOR_STARTER_REPO"
 [ -z "$TUTOR_STARTER_REPO" ] || [ -n "$TUTOR_STARTER" ] || fail "starterRepo needs a starter to clone into; set starter too, or leave starterRepo empty."
+# pluginVersion and pluginSha256. The pinned version uses the pinned SHA-256;
+# a pluginSha256 given with it must equal the pin. Any other version needs its
+# own pluginSha256, because the release's .sha256 file is never trusted.
+tutor_plugin_valid_version "$TUTOR_PLUGIN_VERSION" \
+    || fail "pluginVersion must be a plain semantic version such as 0.1.0 (no 'v' prefix, range or build metadata); received '$TUTOR_PLUGIN_VERSION'."
+[ -z "$TUTOR_PLUGIN_SHA256" ] || tutor_plugin_valid_sha256 "$TUTOR_PLUGIN_SHA256" \
+    || fail "pluginSha256 must be empty or 64 lower-case hex digits: the SHA-256 of bb-plugin-tutor-<pluginVersion>.tgz."
+if [ "$TUTOR_PLUGIN_VERSION" = "$TUTOR_PLUGIN_PINNED_VERSION" ]; then
+    [ -z "$TUTOR_PLUGIN_SHA256" ] || [ "$TUTOR_PLUGIN_SHA256" = "$TUTOR_PLUGIN_PINNED_SHA256" ] \
+        || fail "pluginSha256 differs from this Feature's pinned SHA-256 for plugin $TUTOR_PLUGIN_VERSION; leave pluginSha256 empty to use the pin."
+    tutor_plugin_sha256="$TUTOR_PLUGIN_PINNED_SHA256"
+else
+    [ -n "$TUTOR_PLUGIN_SHA256" ] \
+        || fail "pluginSha256 is required when pluginVersion ($TUTOR_PLUGIN_VERSION) is not this Feature's pinned $TUTOR_PLUGIN_PINNED_VERSION; set it to the SHA-256 of bb-plugin-tutor-$TUTOR_PLUGIN_VERSION.tgz."
+    tutor_plugin_sha256="$TUTOR_PLUGIN_SHA256"
+fi
 
 command -v node >/dev/null 2>&1 || fail "Node.js is required; use a Node.js base image, as the bb Feature does."
 command -v npm >/dev/null 2>&1 || fail "npm is required; use a Node.js base image, as the bb Feature does."
@@ -88,12 +113,15 @@ BB_CLI="$(dirname "$BB_FEATURE_APP_BIN")/bb"
 workdir="$(mktemp -d)"
 trap 'rm -rf "$workdir"' EXIT
 
-# Stage the plugin source. A developer checkout may carry node_modules and
-# dist; both are rebuilt here from the lockfile so the image is reproducible.
+# Stage the plugin sources from the pinned release. The tarball is verified
+# against the SHA-256 before it is read, and every member is checked before it
+# is extracted; it carries no node_modules or dist, which are built below.
+tutor_plugin_valid_sha256 "$tutor_plugin_sha256" \
+    || fail "this Feature's pinned SHA-256 for plugin $TUTOR_PLUGIN_PINNED_VERSION is not set yet (plugin-pin.sh holds a placeholder). Set pluginVersion and pluginSha256 to a released plugin."
 rm -rf "$PLUGIN_DIR" "$TOOLCHAIN_DIR"
 install -d -m 0755 "$SHARE_DIR" "$SHARE_DIR/bin" "$PLUGIN_DIR" "$TOOLCHAIN_DIR"
-[ -f "$FEATURE_DIR/plugin/package.json" ] && [ -f "$FEATURE_DIR/plugin/package-lock.json" ] || fail "the plugin source is missing from the Feature."
-tar -C "$FEATURE_DIR/plugin" --exclude=./node_modules --exclude=./dist -cf - . | tar -C "$PLUGIN_DIR" --no-same-owner -xf -
+tutor_plugin_fetch "$TUTOR_PLUGIN_VERSION" "$tutor_plugin_sha256" "$workdir" "$PLUGIN_DIR" \
+    || fail "could not install bb-plugin-tutor $TUTOR_PLUGIN_VERSION; see the message above."
 
 # Runtime dependencies only: bb shims the SDK and UI packages for plugins, and
 # none of the runtime dependencies needs an install script.
@@ -116,7 +144,7 @@ mv "${toolchains[@]}" "$TOOLCHAIN_DIR/"
 
 chown -R root:root "$PLUGIN_DIR" "$TOOLCHAIN_DIR"
 chmod -R u+rwX,go+rX,go-w "$PLUGIN_DIR" "$TOOLCHAIN_DIR"
-# The Feature content arrives with every file executable; plugin sources are data.
+# Plugin sources are data, whatever modes the release archive recorded.
 find "$PLUGIN_DIR" -path "$PLUGIN_DIR/node_modules" -prune -o -type f -exec chmod 0644 {} +
 # The start-up hook stages a user-owned copy per plugin build (a path install
 # rewrites dist/), keyed by this digest. dist/ is included so that a new bb-app
@@ -167,4 +195,4 @@ ln -sfn "$SHARE_DIR/bin/tutor-feature-autostart" /usr/local/bin/tutor-feature-au
 ln -sfn "$SHARE_DIR/bin/tutor-keepalive" /usr/local/bin/tutor-keepalive
 
 plugin_version="$(node -e 'process.stdout.write(require(process.argv[1]).version)' "$PLUGIN_DIR/package.json")"
-echo "Installed the Tutor plugin ${plugin_version} in ${PLUGIN_DIR}; it is path-installed into BB when the container starts."
+echo "Installed the Tutor plugin ${plugin_version} (sha256 ${tutor_plugin_sha256}) in ${PLUGIN_DIR}; it is path-installed into BB when the container starts."

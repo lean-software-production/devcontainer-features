@@ -47,7 +47,10 @@ Tutor now follows the starter. Every place this diverges from DESIGN.md:
   running `fetch-iteration` or `fetch.sh` and editing `ITERATION` or `spec/PROGRESS.yaml` by hand;
   the skill maps "fetch-iteration / fetch.sh" to `tutor_adopt_iteration`. A lesson set to WIP
   outside Tutor, with no progress recorded, can be adopted again by its own coach; before, that
-  deadlocked, since the lesson demanded adoption and none was offered.
+  deadlocked, since the lesson demanded adoption and none was offered. `tutor_status` says "Not
+  adopted in Tutor yet" for such a lesson. A `spec/PROGRESS.yaml` that is there but can't be read
+  or parsed is not "no progress": adopting over it would lose its marks, so the tools refuse and
+  ask for the file to be repaired.
 - **First run finds starter factories.** A folder qualifies with a root `ITERATION`, an older
   `spec/ITERATION`, or an AGENTS.md naming the coach, compared without the file's extension, so the
   starter's AGENTS.md naming **coach-me** qualifies. The detail reads "ITERATION · NNN status" or
@@ -55,8 +58,8 @@ Tutor now follows the starter. Every place this diverges from DESIGN.md:
   starter, not a repo coach-me creates, and the welcome page says to fork the starter and add its
   `tetris/.factory` folder as a BB project.
 - **The feature clones the starter** (feature 0.4.0). The new options `starter` and `starterRepo`
-  mirror `course` and `courseRepo` and default to empty. The start-up hook clones `starterRepo`
-  into `starter` when that folder is missing; a failed clone, of either repo, never fails the hook
+  mirror `course` and `courseRepo` and default to empty. The post-create hook
+  (tutor-feature-bootstrap) clones `starterRepo` into `starter` when that folder is missing; a failed clone, of either repo, never fails the hook
   or stops the other. `starter` must be a safe absolute path different from `course`, and
   `starterRepo` needs a `starter` and must be https. `factory` stays explicit. A dot-folder factory
   is registered as the BB project `<parent>/<name>`, so the starter's is "tetris/.factory".

@@ -164,10 +164,12 @@ else
 fi
 
 # The plugin reads course/factory/dataDir from this JSON; the hooks read options.tsv.
+# schemaVersion 1 is the contract with bb-plugin-tutor, which treats a missing
+# value as 1 and refuses any other.
 install -d -m 0755 "$CONFIG_DIR"
 node -e '
 const [course, factory, dataDir] = process.argv.slice(1);
-const config = { course };
+const config = { schemaVersion: 1, course };
 if (factory) config.factory = factory;
 if (dataDir) config.dataDir = dataDir;
 process.stdout.write(JSON.stringify(config, null, 2) + "\n");

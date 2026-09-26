@@ -8,9 +8,12 @@ composes:
   only the BB server port 38886 forwarded;
 - the [tutor Feature](../../src/tutor), which clones the public
   [tutorial](https://github.com/lean-software-production/tutorial) into
-  `/workspaces/tutorial`, and expects the student's factory at
-  `/workspaces/my-factory` (coach-me's suggested `../my-factory`). On first
-  start it selects the Tutor paper theme and switches off BB plugins a student
+  `/workspaces/tutorial` and the
+  [capstone-project-starter](https://github.com/lean-software-production/capstone-project-starter)
+  into `/workspaces/capstone-project-starter`, and registers the starter's
+  factory, `/workspaces/capstone-project-starter/tetris/.factory`, as the BB
+  project `tetris/.factory`. It clones the upstream starter, not the
+  student's fork. On first start it selects the Tutor paper theme and switches off BB plugins a student
   does not need (Automations, Workflows, Connect and others; see its
   `disablePlugins` option); a student can turn any back on;
 - the [Claude Code](../../src/claude-code), [Codex](../../src/codex) and
@@ -70,7 +73,8 @@ references and delete `features/` and the sync script.
 `test/tutor/codespace-entry.sh` brings this configuration up with the
 devcontainer CLI, changing only what a local Docker host cannot provide like
 Codespaces does: ports 48886/48887 instead of 38886/38887, and home-directory
-paths instead of `/workspaces`. It checks the Tutor plugin, the outline, the three
+paths instead of `/workspaces`. It checks the course and starter clones, the
+factory project `tetris/.factory`, the Tutor plugin, the outline, the three
 agent CLIs (on `PATH` and reported installed by `bb updates status`), the
 switched-off plugins, the theme, and that `tutor-keepalive` returns at once
 outside Codespaces.

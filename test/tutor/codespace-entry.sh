@@ -29,6 +29,7 @@ const tutor = config.features["./features/tutor"];
 Object.assign(bb, { serverPort: "48886", hostDaemonPort: "48887", dataDir: "/home/node/.bb-state" });
 Object.assign(tutor, {
   course: tutor.course.replace(/^\/workspaces\//, "/home/node/"),
+  starter: tutor.starter.replace(/^\/workspaces\//, "/home/node/"),
   factory: tutor.factory.replace(/^\/workspaces\//, "/home/node/"),
 });
 config.forwardPorts = [];
@@ -57,6 +58,13 @@ check() {
 }
 check "bb is running" in_container bb-feature-status
 check "the course was cloned" in_container git -C /home/node/tutorial rev-parse --verify HEAD
+check "the starter was cloned" in_container git -C /home/node/capstone-project-starter rev-parse --verify HEAD
+check "the starter's factory is a BB project named tetris/.factory" in_container bash -c 'bb project list --json | node -e "
+let s = \"\"; process.stdin.on(\"data\", (d) => (s += d)).on(\"end\", () => {
+  const factory = \"/home/node/capstone-project-starter/tetris/.factory\";
+  const p = JSON.parse(s).find((x) => (x.sources || []).some((src) => src.type === \"local_path\" && src.path === factory));
+  if (!p || p.name !== \"tetris/.factory\") { console.error(\"the factory is not a BB project named tetris/.factory:\", p); process.exit(1); }
+});"'
 check "the Tutor plugin is running" in_container bash -c 'bb plugin list --json | node -e "
 let s = \"\"; process.stdin.on(\"data\", (d) => (s += d)).on(\"end\", () => {
   const p = JSON.parse(s).plugins.find((x) => x.id === \"tutor\");
@@ -86,4 +94,4 @@ check "config.json tells the plugin where the activity file goes" in_container n
 # holds up devcontainer up (which has already run it as postAttachCommand).
 check "postAttachCommand ran tutor-keepalive" grep -q "only runs in a GitHub Codespace" "$workspace/up.log"
 check "tutor-keepalive returns at once outside Codespaces" in_container bash -c 'timeout 10 tutor-keepalive | grep -q "only runs in a GitHub Codespace"'
-echo 'Codespace entry point came up with Tutor running, the agent CLIs installed and BB branded'
+echo 'Codespace entry point came up with Tutor running, the starter cloned, the agent CLIs installed and BB branded'

@@ -50,12 +50,13 @@ function refusal(text: string): PluginAgentToolResult {
   return { content: [{ type: "text", text }], isError: true };
 }
 
-async function applyOutcome(rt: TutorRuntime, root: string, outcome: Outcome, caller: Caller): Promise<void> {
+async function applyOutcome(rt: TutorRuntime, state: CoachState, outcome: Outcome, caller: Caller): Promise<void> {
   if ("error" in outcome) return;
   if (outcome.reached !== undefined) await recordReachedRule(rt.bb.sdk, caller.coachThreadId, outcome.reached);
-  if (outcome.adopt !== undefined) await copyLessonSpec(root, outcome.adopt);
-  if (outcome.iteration !== undefined) await rt.store.writeIteration(root, outcome.iteration);
-  if (outcome.progress !== undefined) await rt.store.writeProgress(root, outcome.progress);
+  // Adoption writes spec/, the seed and stand-ins/ before ITERATION, so ITERATION never names a lesson that isn't there.
+  if (outcome.adopt !== undefined) await copyLessonSpec(state.root, outcome.adopt, { courseRoot: state.course.root });
+  if (outcome.iteration !== undefined) await rt.store.writeIteration(state.root, outcome.iteration);
+  if (outcome.progress !== undefined) await rt.store.writeProgress(state.root, outcome.progress);
   if (outcome.iteration !== undefined || outcome.progress !== undefined) {
     rt.signals.publish(outcome.iteration === undefined ? "progress" : "iteration", outcome.progress?.iteration ?? null);
   }
@@ -77,7 +78,7 @@ function register<Name extends ToolName>(rt: TutorRuntime, spec: ToolSpec<Name>)
         if (otherLesson !== null) return refusal(otherLesson);
         const outcome = await spec.action(state, input, caller, isoSeconds(rt.now()));
         if ("error" in outcome) return refusal(outcome.error);
-        await applyOutcome(rt, state.root, outcome, caller);
+        await applyOutcome(rt, state, outcome, caller);
         return outcome.text;
       };
       try {
@@ -156,7 +157,7 @@ export function registerCoachTools(rt: TutorRuntime): void {
   register(rt, {
     name: TOOL_NAMES.adoptIteration,
     description:
-      "Adopt this coach thread's lesson (an iteration, in the course repo's words) as coach-me does: copy its README.md, FACTORY.md and features/ into spec/, its sample seed into seeds/, write spec/ITERATION as WIP and start spec/PROGRESS.yaml, carrying over Examples already passing. Does not commit. A coach thread adopts only its own lesson.",
+      "Adopt this coach thread's lesson (an iteration, in the course repo's words) as fetch-iteration does, from the course on this machine: copy its README.md, FACTORY.md and features/ into spec/, its sample seed into ../seeds/ unless one is there, refresh stand-ins/, write ITERATION as WIP and start spec/PROGRESS.yaml, carrying over Examples already passing. Use it instead of fetch-iteration or fetch.sh. Does not commit. A coach thread adopts only its own lesson.",
     label: { pending: "Adopting the lesson", completed: "Adopted the lesson" },
     // Adopting makes the caller's lesson the current one, so it checks the lesson itself.
     lesson: "any",
@@ -168,7 +169,7 @@ export function registerCoachTools(rt: TutorRuntime): void {
   register(rt, {
     name: TOOL_NAMES.completeIteration,
     description:
-      "Finish the current lesson: write spec/ITERATION as Done and store your two- or three-sentence summary for the student. Returns a ::tutor-progress card to echo.",
+      "Finish the current lesson: write ITERATION as Done and store your two- or three-sentence summary for the student. Returns a ::tutor-progress card to echo.",
     label: { pending: "Completing the lesson", completed: "Completed the lesson" },
     lesson: "current",
     action: (state, input) => completeAction(state, input),

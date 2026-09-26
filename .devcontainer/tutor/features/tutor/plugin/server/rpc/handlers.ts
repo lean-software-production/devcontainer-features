@@ -210,7 +210,7 @@ export function registerRpc(rt: TutorRuntime): void {
       if (factoryProject.status !== "found") {
         throw new Error("That project has no folder on this machine, so Tutor cannot coach in it.");
       }
-      // The coach writes spec/ and seeds/ into the factory, so it must never be the course checkout.
+      // The coach writes spec/, stand-ins/ and ../seeds/ beside the factory, so it must never be the course checkout.
       const { coursePath } = await rt.world.load();
       if (overlaps(await realPath(factoryProject.root), await realPath(coursePath))) {
         throw new Error("That project's folder is, or shares a folder with, the course. Pick the repo you build your factory in.");
@@ -228,7 +228,7 @@ export function registerRpc(rt: TutorRuntime): void {
       if (world.pointer === null || lessonStatus(course, world.pointer, lesson.id) === "ahead") {
         throw new Error(`Lesson ${lesson.id} has not started yet.`);
       }
-      return findOrSpawnCoach(course, factoryProject, lesson, () => coachThreadPrompt(course, lesson, startFor(world, course, lesson)));
+      return findOrSpawnCoach(course, factoryProject, lesson, () => coachThreadPrompt(course, world.coachPath, lesson, startFor(world, course, lesson)));
     },
 
     startNextLesson: async ({ lessonId }) => {
@@ -239,7 +239,7 @@ export function registerRpc(rt: TutorRuntime): void {
       if (lesson.builtin || world.pointer === null || !adoptionTargets(course, world.pointer).includes(lesson.id)) {
         throw new Error(`Lesson ${lesson.id} cannot be started yet: finish the lesson before it first.`);
       }
-      const { threadId } = await findOrSpawnCoach(course, factoryProject, lesson, () => coachThreadPrompt(course, lesson, "adopt"));
+      const { threadId } = await findOrSpawnCoach(course, factoryProject, lesson, () => coachThreadPrompt(course, world.coachPath, lesson, "adopt"));
       return { threadId };
     },
 
@@ -298,7 +298,7 @@ export function registerRpc(rt: TutorRuntime): void {
       }
       const rule = requireRule(lesson, ruleKey);
       const coachThread = await findOrSpawnCoach(course, factoryProject, lesson, () =>
-        coachThreadPrompt(course, lesson, startFor(world, course, lesson), rule),
+        coachThreadPrompt(course, world.coachPath, lesson, startFor(world, course, lesson), rule),
       );
       if (coachThread.created) return { threadId: coachThread.threadId };
       await bb.sdk.threads.send({

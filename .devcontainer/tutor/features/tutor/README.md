@@ -4,9 +4,9 @@ Adds the Tutor BB plugin to the [bb Feature](../bb)'s standalone server: a
 course outline in the sidebar and a coach thread per lesson that works one
 Gherkin Rule at a time. The plugin is prebuilt while the image is
 built and path-installed into BB each time the container starts; nothing is
-fetched at start-up except the optional course clone. On first start it also
-brands BB with the Tutor paper theme and switches off BB plugins a student
-does not need; a student can undo either.
+fetched at start-up except the optional course and starter clones. On first
+start it also brands BB with the Tutor paper theme and switches off BB plugins
+a student does not need; a student can undo either.
 
 ## Example Usage
 
@@ -20,7 +20,9 @@ does not need; a student can undo either.
     },
     "ghcr.io/lean-software-production/devcontainer-features/tutor:0": {
       "course": "/workspaces/tutorial",
-      "factory": "/workspaces/my-factory"
+      "starter": "/workspaces/capstone-project-starter",
+      "starterRepo": "https://github.com/lean-software-production/capstone-project-starter.git",
+      "factory": "/workspaces/capstone-project-starter/tetris/.factory"
     }
   },
   "overrideFeatureInstallOrder": [
@@ -40,7 +42,9 @@ which composes local copies of both Features.
 | --- | --- | --- | --- |
 | `course` | string | `/workspaces/tutorial` | Absolute path of the course checkout the plugin reads. |
 | `courseRepo` | string | `https://github.com/lean-software-production/tutorial.git` | HTTPS Git URL cloned into `course` after the container is created, if `course` does not exist. Empty never clones. |
-| `factory` | string | empty | Optional absolute path of the student's factory repository. Registered as a BB project once it exists, and pre-selected by the plugin. |
+| `starter` | string | empty | Optional absolute path of the student's [capstone-project-starter](https://github.com/lean-software-production/capstone-project-starter) checkout, which holds the factory. Must differ from `course`. |
+| `starterRepo` | string | empty | HTTPS Git URL cloned into `starter` after the container is created, if `starter` does not exist. Needs `starter`. Empty never clones. |
+| `factory` | string | empty | Optional absolute path of the student's factory, the folder holding `spec/` and `ITERATION` (in the starter, `<starter>/tetris/.factory`). Registered as a BB project once it exists, and pre-selected by the plugin. A dot-folder is named with its parent, so the starter's factory is the project `tetris/.factory`. |
 | `selectOutline` | boolean | `true` | Select the course outline as BB's sidebar thread list once, unless another thread list was chosen already. |
 | `disablePlugins` | string | `automations,workflows,tasks,scheduled-send,github,browser-automation,agent-annotations,connect,plugin-api-docs,plugin-api-tester,theme-preview,keep-awake,account-pool,environment-modal-sandbox` | Comma-separated BB plugin ids to switch off once per BB state directory; a student can turn any back on. Missing plugins are skipped. `tutor`, `thread-list`, `provider-*` and the workspace environments are never switched off. Empty switches off nothing. |
 | `theme` | string | `plugin:tutor:paper` | BB theme to select once per BB state directory, only while BB's default theme is active. Empty leaves the theme alone. |

@@ -5,7 +5,9 @@ instead of a real coding agent. It targets bb-app 0.43.4 and plugin SDK 0.5.9,
 and is modelled on upstream `examples/plugins/echo-provider`.
 
 **Never install this into a BB you care about.** Use a disposable container,
-such as the Feature scenarios in `test/tutor/` or `scripts/tutor-dev/`.
+such as the Feature scenarios in `test/tutor/` or the plugin repository's dev
+harness,
+[`scripts/tutor-dev/`](https://github.com/lean-software-production/bb-plugin-tutor/tree/main/scripts/tutor-dev).
 
 Every turn replies with one assistant message. It opens with:
 

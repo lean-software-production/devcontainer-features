@@ -1,8 +1,12 @@
 ## What this Feature adds
 
-Tutor is a BB plugin (source in [`plugin/`](plugin), design in
-[`docs/tutor/`](../../docs/tutor/DESIGN.md)) plus the lifecycle glue that puts
-it into the [bb Feature](../bb)'s standalone server. It inherits that
+Tutor is a BB plugin, developed in its own repository,
+[lean-software-production/bb-plugin-tutor](https://github.com/lean-software-production/bb-plugin-tutor)
+(design in its [`docs/DESIGN.md`](https://github.com/lean-software-production/bb-plugin-tutor/blob/main/docs/DESIGN.md),
+local dev harness in
+[`scripts/tutor-dev/`](https://github.com/lean-software-production/bb-plugin-tutor/tree/main/scripts/tutor-dev)).
+This Feature is the lifecycle glue that puts a pinned release of it into the
+[bb Feature](../bb)'s standalone server. It inherits that
 Feature's security model unchanged: one learner-owned BB bound to `127.0.0.1`,
 only the server port forwarded (keep it **Private** in the Codespaces Ports
 view), no credentials installed or copied, and no host-daemon forwarding. The

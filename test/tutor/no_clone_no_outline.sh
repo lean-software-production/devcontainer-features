@@ -13,8 +13,9 @@ check "plugin config names the default state directory" bash -c 'node -e "const 
 check "an empty disablePlugins leaves every plugin on" bash -c 'bb plugin list --json | node -e "let s=\"\";process.stdin.on(\"data\",(d)=>(s+=d)).on(\"end\",()=>process.exit(JSON.parse(s).plugins.find((x)=>x.id===\"automations\").enabled ? 0 : 1))"'
 check "an empty theme leaves BB's theme alone" bash -c 'bb theme show --json | grep -q "\"themeId\": \"default\""'
 check "empty courseRepo never clones" bash -c 'test ! -e /home/node/absent-course'
+check "empty starterRepo never clones" bash -c 'test ! -e /home/node/absent-starter'
 check "tutor plugin is running from the default state directory" bash -c 'bb plugin list --json | node -e "let s=\"\";process.stdin.on(\"data\",(d)=>(s+=d)).on(\"end\",()=>{const p=JSON.parse(s).plugins.find((x)=>x.id===\"tutor\"); process.exit(p && p.status===\"running\" && p.rootDir.startsWith(process.env.HOME+\"/.bb/.tutor-feature/plugin-\") ? 0 : 1)})"'
 check "missing course is not registered" bash -c 'test "$(bb project list --json | node -e "let s=\"\";process.stdin.on(\"data\",(d)=>(s+=d)).on(\"end\",()=>process.stdout.write(String(JSON.parse(s).length)))")" = 0'
 check "selectOutline false leaves the thread list alone" bash -c 'bb settings ui get sidebar.threadListProvider --json | grep -q "\"thread-list/thread-list\""'
-check "bootstrap is a clean no-op" bash -c 'tutor-feature-bootstrap 2>&1 | grep -q "courseRepo is empty"'
+check "bootstrap is a clean no-op" bash -c 'out=$(tutor-feature-bootstrap 2>&1) && grep -q "courseRepo is empty" <<<"$out" && grep -q "starterRepo is empty" <<<"$out"'
 reportResults

@@ -27,8 +27,10 @@ compositions keep the override.
 ## Image build (`install.sh`, root)
 
 1. Validates the options: absolute paths without dot segments, quotes, control
-   characters or shell metacharacters; `courseRepo` empty or an `https://` URL
-   without credentials, query or fragment.
+   characters or shell metacharacters; `factory` and `starter` each different
+   from `course`; `courseRepo` and `starterRepo` empty or an `https://` URL
+   without credentials, query or fragment; `starterRepo` only with a
+   `starter`.
 2. Checks that the bb Feature is installed in `standalone` mode.
 3. Stages the plugin at `/usr/local/share/tutor/plugin`, root-owned and not
    writable by the learner, runs `npm ci --omit=dev --ignore-scripts` (bb
@@ -40,12 +42,14 @@ compositions keep the override.
    `/usr/local/share/tutor/toolchain`, so no start-up needs the network.
 5. Writes `/usr/local/etc/tutor/config.json` (`{ "course", "factory",
    "dataDir" }`, the contract the plugin reads; `factory` is omitted when
-   empty) and `/usr/local/share/tutor/options.tsv` (for the hooks), both
-   root-owned 0644, plus `plugin.sha256`, a digest of the staged plugin without
-   `node_modules` and `dist`. `dataDir` is the BB state directory the hooks
-   use: the bb Feature's `dataDir`, or `<remote user's home>/.bb` when that is
-   empty (from `_REMOTE_USER_HOME`; omitted if the home is unknown). The plugin
-   writes the keep-alive's activity file beneath it.
+   empty, and `starter` is not part of it, because the plugin finds the
+   codebase from the factory) and `/usr/local/share/tutor/options.tsv` (for
+   the hooks), both root-owned 0644, plus `plugin.sha256`, a digest of the
+   staged plugin without `node_modules` and `dist`. `dataDir` is the BB state
+   directory the hooks use: the bb Feature's `dataDir`, or `<remote user's
+   home>/.bb` when that is empty (from `_REMOTE_USER_HOME`; omitted if the
+   home is unknown). The plugin writes the keep-alive's activity file beneath
+   it.
 6. Validates `disablePlugins` (comma-separated ids of lower-case letters,
    digits and `-`) and `theme` (a theme id such as `plugin:tutor:paper`), and
    warns about any listed plugin Tutor needs.
@@ -53,11 +57,13 @@ compositions keep the override.
 ## Lifecycle hooks (remote user)
 
 `postCreateCommand` runs `tutor-feature-bootstrap`: if `course` does not exist
-and `courseRepo` is set, it runs `git clone -- <courseRepo> <course>`. A clone
-that cannot happen (no writable parent, no network) is reported with the
-command to run, and never fails the hook, because a failing lifecycle command
-would stop BB's own start-up hook. The plugin then shows the student that the
-course is missing.
+and `courseRepo` is set, it runs `git clone -- <courseRepo> <course>`, and then
+the same for `starter` and `starterRepo`. Each clone is independent: a failed
+course clone still clones the starter. A clone that cannot happen (no writable
+parent, no network) is reported with the command to run, and never fails the
+hook, because a failing lifecycle command would stop BB's own start-up hook.
+The plugin then shows the student that the course is missing. The Codespace
+entry point clones the upstream starter, not the student's fork.
 
 `postStartCommand` runs `tutor-feature-autostart`. Feature hooks run in install
 order, so it follows `bb-feature-autostart`. It:
@@ -83,7 +89,10 @@ order, so it follows `bb-feature-autostart`. It:
   before using it;
 - registers `course` and `factory` as BB projects when the directory exists
   and no project has that local source path yet (the plugin itself never
-  creates projects);
+  creates projects). A project is named after its folder, except that a
+  dot-folder is named with its parent, so the starter's factory
+  `<starter>/tetris/.factory` is the project `tetris/.factory` rather than
+  `.factory`. The starter itself is not registered;
 - selects the course outline with
   `bb settings ui set sidebar.threadListProvider tutor/course-outline`, once per
   state directory, only when the plugin is installed, `selectOutline` is true,
@@ -175,14 +184,16 @@ CI runs:
     Codespaces; and, with the credential-free
     [scripted provider](../../test/tutor/fixtures/scripted-provider), a thread
     Tutor did not spawn is neither offered Tutor's tools nor able to run one.
-  - `no_clone_no_outline`: an empty `courseRepo`, `selectOutline: false`, an empty
-    `disablePlugins` and an empty `theme` in the default state directory;
+  - `no_clone_no_outline`: an empty `courseRepo` and `starterRepo`,
+    `selectOutline: false`, an empty `disablePlugins` and an empty `theme` in
+    the default state directory;
 - hermetic tests of the option validation and of every hook decision against
   a fake bb CLI, including the keep-alive's freshness window and single
   instance;
 - a bring-up of the Codespace entry point itself (`codespace-entry.sh`, on
   ports 48886/48887 and with `/workspaces` paths moved under the home
-  directory), including the Claude Code, Codex and Pi CLIs on BB's `PATH` and
+  directory), including the starter clone and its factory registered as
+  `tetris/.factory`, the Claude Code, Codex and Pi CLIs on BB's `PATH` and
   reported installed by `bb updates status`, the switched-off plugins and the
   theme;
 - the check that the entry point's Feature copies match `src/`.

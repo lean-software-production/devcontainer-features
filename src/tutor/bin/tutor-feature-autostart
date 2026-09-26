@@ -125,6 +125,16 @@ install_plugin() {
     esac
 }
 
+# A project is named after its folder, except that a dot-folder such as the
+# starter's tetris/.factory is named with its parent ("tetris/.factory"), so
+# the sidebar says whose factory it is.
+project_name() {
+    local name
+    name="$(basename -- "$1")"
+    [[ "$name" != .* ]] || name="$(basename -- "$(dirname -- "$1")")/$name"
+    printf '%s' "$name"
+}
+
 register_project() {
     local label="$1" dir="$2" projects
     [ -n "$dir" ] || return 0
@@ -137,7 +147,7 @@ register_project() {
         tutor_log "$label $dir is already a BB project"
         return 0
     fi
-    tutor_bb project create --name "$(basename -- "$dir")" --root "$dir" >/dev/null || { tutor_fail "cannot register the $label $dir as a BB project"; return 1; }
+    tutor_bb project create --name "$(project_name "$dir")" --root "$dir" >/dev/null || { tutor_fail "cannot register the $label $dir as a BB project"; return 1; }
     tutor_log "registered the $label $dir as a BB project"
 }
 

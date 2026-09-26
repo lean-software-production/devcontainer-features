@@ -1,6 +1,6 @@
 {
   "id": "tutor",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "name": "Tutor coached course for BB",
   "description": "Adds the Tutor BB plugin to the bb Feature's standalone server: a course outline in the sidebar and a coach thread per lesson that works one Gherkin Rule at a time. Requires the bb Feature in standalone mode.",
   "documentationURL": "https://github.com/lean-software-production/devcontainer-features/tree/main/src/tutor",
@@ -16,10 +16,21 @@
       "default": "https://github.com/lean-software-production/tutorial.git",
       "description": "HTTPS Git URL cloned into 'course' after the container is created, if 'course' does not exist yet. Empty never clones."
     },
+    "starter": {
+      "type": "string",
+      "default": "",
+      "description": "Optional absolute path of the student's capstone-project-starter checkout, which holds the factory (for example /workspaces/capstone-project-starter). Must differ from 'course'. Empty means no starter."
+    },
+    "starterRepo": {
+      "type": "string",
+      "proposals": ["https://github.com/lean-software-production/capstone-project-starter.git", ""],
+      "default": "",
+      "description": "HTTPS Git URL cloned into 'starter' after the container is created, if 'starter' does not exist yet. Needs 'starter'. Empty never clones."
+    },
     "factory": {
       "type": "string",
       "default": "",
-      "description": "Optional absolute path of the student's factory repository. When it exists it is registered as a BB project, and the plugin pre-selects it."
+      "description": "Optional absolute path of the student's factory: the folder holding spec/ and ITERATION, such as <starter>/tetris/.factory. When it exists it is registered as a BB project, and the plugin pre-selects it."
     },
     "selectOutline": {
       "type": "boolean",

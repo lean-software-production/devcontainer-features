@@ -8,6 +8,8 @@ set -euo pipefail
 
 TUTOR_COURSE="${COURSE-/workspaces/tutorial}"
 TUTOR_COURSE_REPO="${COURSEREPO-https://github.com/lean-software-production/tutorial.git}"
+TUTOR_STARTER="${STARTER-}"
+TUTOR_STARTER_REPO="${STARTERREPO-}"
 TUTOR_FACTORY="${FACTORY-}"
 TUTOR_SELECT_OUTLINE="${SELECTOUTLINE:-true}"
 TUTOR_DISABLE_PLUGINS="${DISABLEPLUGINS-automations,workflows,tasks,scheduled-send,github,browser-automation,agent-annotations,connect,plugin-api-docs,plugin-api-tester,theme-preview,keep-awake,account-pool,environment-modal-sandbox}"
@@ -32,7 +34,10 @@ strip_trailing_slashes() { local value="$1"; while [ "${#value}" -gt 1 ] && [[ "
 
 TUTOR_COURSE="$(strip_trailing_slashes "$TUTOR_COURSE")"
 TUTOR_FACTORY="$(strip_trailing_slashes "$TUTOR_FACTORY")"
+TUTOR_STARTER="$(strip_trailing_slashes "$TUTOR_STARTER")"
 valid_path "$TUTOR_COURSE" || fail "course must be an absolute path without dot segments, control characters, quotes or shell metacharacters; received '$TUTOR_COURSE'."
+[ -z "$TUTOR_STARTER" ] || valid_path "$TUTOR_STARTER" || fail "starter must be empty or an absolute path without dot segments, control characters, quotes or shell metacharacters; received '$TUTOR_STARTER'."
+[ -z "$TUTOR_STARTER" ] || [ "$TUTOR_STARTER" != "$TUTOR_COURSE" ] || fail "starter and course must be different directories."
 [ -z "$TUTOR_FACTORY" ] || valid_path "$TUTOR_FACTORY" || fail "factory must be empty or an absolute path without dot segments, control characters, quotes or shell metacharacters; received '$TUTOR_FACTORY'."
 [ -z "$TUTOR_FACTORY" ] || [ "$TUTOR_FACTORY" != "$TUTOR_COURSE" ] || fail "factory and course must be different directories."
 case "$TUTOR_SELECT_OUTLINE" in true|false) ;; *) fail "selectOutline must be true or false; received '$TUTOR_SELECT_OUTLINE'." ;; esac
@@ -51,17 +56,23 @@ if [ -n "$TUTOR_THEME" ]; then
     [[ "$TUTOR_THEME" =~ ^[A-Za-z0-9][A-Za-z0-9:._-]*$ ]] \
         || fail "theme must be empty or a BB theme id such as 'plugin:tutor:paper' or 'nord'; received '$TUTOR_THEME'."
 fi
-if [ -n "$TUTOR_COURSE_REPO" ]; then
-    { [[ "$TUTOR_COURSE_REPO" = https://* ]] && ! has_unsafe_chars "$TUTOR_COURSE_REPO" && [[ "$TUTOR_COURSE_REPO" != *[[:space:]]* ]]; } \
-        || fail "courseRepo must be empty or an https:// URL without spaces or shell metacharacters."
-fi
+# courseRepo and starterRepo: <option name> <value>.
+check_repo_text() {
+    [ -z "$2" ] || { [[ "$2" = https://* ]] && ! has_unsafe_chars "$2" && [[ "$2" != *[[:space:]]* ]]; } \
+        || fail "$1 must be empty or an https:// URL without spaces or shell metacharacters."
+}
+check_repo_text courseRepo "$TUTOR_COURSE_REPO"
+check_repo_text starterRepo "$TUTOR_STARTER_REPO"
+[ -z "$TUTOR_STARTER_REPO" ] || [ -n "$TUTOR_STARTER" ] || fail "starterRepo needs a starter to clone into; set starter too, or leave starterRepo empty."
 
 command -v node >/dev/null 2>&1 || fail "Node.js is required; use a Node.js base image, as the bb Feature does."
 command -v npm >/dev/null 2>&1 || fail "npm is required; use a Node.js base image, as the bb Feature does."
-if [ -n "$TUTOR_COURSE_REPO" ]; then
-    node -e 'let u; try { u = new URL(process.argv[1]); } catch { process.exit(2); } if (u.protocol !== "https:" || u.username || u.password || u.search || u.hash) process.exit(2);' "$TUTOR_COURSE_REPO" \
-        || fail "courseRepo must be an https:// URL with no credentials, query or fragment."
-fi
+check_repo_url() {
+    [ -z "$2" ] || node -e 'let u; try { u = new URL(process.argv[1]); } catch { process.exit(2); } if (u.protocol !== "https:" || u.username || u.password || u.search || u.hash) process.exit(2);' "$2" \
+        || fail "$1 must be an https:// URL with no credentials, query or fragment."
+}
+check_repo_url courseRepo "$TUTOR_COURSE_REPO"
+check_repo_url starterRepo "$TUTOR_STARTER_REPO"
 
 # The plugin runs inside the bb Feature's standalone server and is built with
 # its packaged CLI, so that Feature must already be installed.
@@ -137,6 +148,8 @@ write_option() { printf '%s\t%s\n' "$1" "$2"; }
 {
     write_option COURSE "$TUTOR_COURSE"
     write_option COURSE_REPO "$TUTOR_COURSE_REPO"
+    write_option STARTER "$TUTOR_STARTER"
+    write_option STARTER_REPO "$TUTOR_STARTER_REPO"
     write_option FACTORY "$TUTOR_FACTORY"
     write_option SELECT_OUTLINE "$TUTOR_SELECT_OUTLINE"
     write_option DISABLE_PLUGINS "$TUTOR_DISABLE_PLUGINS"

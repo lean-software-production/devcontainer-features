@@ -14,6 +14,7 @@ fake="$fixture/fake"
 state="$fixture/state with spaces"
 course="$fixture/course"
 factory="$fixture/my-factory"
+starter="$fixture/capstone-project-starter"
 mkdir -p "$bb_share/bin" "$bb_share/npm/bin" "$tutor_share/bin" "$tutor_share/plugin/node_modules/zod" \
     "$tutor_share/plugin/dist" "$tutor_share/toolchain/toolchain-test/node_modules" "$fake/bin"
 
@@ -58,8 +59,10 @@ bb_options() {
         SERVER_PORT 48886 HOST_DAEMON_PORT 48887 DATA_DIR "$state" APP_URL auto BB_APP_BIN "$bb_share/npm/bin/bb-app"
 }
 default_disable=automations,workflows,tasks,github
+# The starter is never cloned unless a check passes a starterRepo (the fifth argument).
 tutor_options() {
     set_options "$tutor_share/options.tsv" COURSE "$course" COURSE_REPO "${1-https://example.invalid/course.git}" \
+        STARTER "$starter" STARTER_REPO "${5-}" \
         FACTORY "$factory" SELECT_OUTLINE "${2:-true}" DISABLE_PLUGINS "${3-$default_disable}" THEME "${4-plugin:tutor:paper}"
 }
 
@@ -136,7 +139,7 @@ FAKE
 chmod 755 "$fake/bin/git"
 
 reset_world() {
-    rm -rf "$state" "$course" "$factory" "$fake"/{calls.log,git.log,projects,plugin-root,plugin-status,down,install-fails,reload-fails,git-fails,toolchain-at-install,disable-fails}
+    rm -rf "$state" "$course" "$factory" "$starter" "$fake"/{calls.log,git.log,projects,plugin-root,plugin-status,down,install-fails,reload-fails,git-fails,toolchain-at-install,disable-fails}
     mkdir -p "$state"
     printf 'thread-list/thread-list' > "$fake/outline"
     printf '%s\n' "automations running" "workflows disabled" "github running" "thread-list running" \
@@ -184,6 +187,7 @@ expect "second start succeeds" test "$rc" = 0
 expect "second start does not reinstall" bash -c "! grep -q 'plugin install' '$fake/calls.log'"
 expect "course is not registered twice" test "$(grep -cxF "$course" "$fake/projects")" = 1
 expect "factory is registered once it exists" grep -qxF "$factory" "$fake/projects"
+expect "a factory is named after its folder" calls_have "project create --name my-factory --root $factory"
 expect "outline decision is made only once" bash -c "! grep -q 'settings ui' '$fake/calls.log'"
 
 reset_world
@@ -205,6 +209,17 @@ run_hook tutor-feature-autostart
 expect "a disabled plugin is left off" test "$(cat "$fake/plugin-status")" = disabled
 expect "a disabled plugin is not reloaded" bash -c "! grep -q 'plugin reload' '$fake/calls.log'"
 expect "a disabled plugin passes the hook" test "$rc" = 0
+
+# The starter's factory is a dot-folder, which alone would name every factory
+# ".factory"; its project is named after the codebase too.
+reset_world
+set_options "$tutor_share/options.tsv" COURSE "$course" COURSE_REPO "" STARTER "$starter" STARTER_REPO "" \
+    FACTORY "$starter/tetris/.factory" SELECT_OUTLINE true DISABLE_PLUGINS "" THEME ""
+mkdir -p "$course" "$starter/tetris/.factory"
+run_hook tutor-feature-autostart
+expect "a factory inside the starter is registered" grep -qxF "$starter/tetris/.factory" "$fake/projects"
+expect "a dot-folder factory is named <codebase>/<folder>" calls_have "project create --name tetris/.factory --root $starter/tetris/.factory"
+expect "the starter itself is not registered" bash -c "! grep -qxF '$starter' '$fake/projects'"
 
 reset_world
 printf '/elsewhere/tutor' > "$fake/plugin-root"; echo running > "$fake/plugin-status"
@@ -362,6 +377,20 @@ tutor_options https://example.invalid/course.git true "$default_disable" 'x;y'
 run_hook tutor-feature-autostart
 expect "a malformed saved theme is refused" out_has "invalid saved theme"
 
+reset_world
+set_options "$tutor_share/options.tsv" COURSE "$course" COURSE_REPO "" STARTER "starter" STARTER_REPO "" \
+    FACTORY "" SELECT_OUTLINE true DISABLE_PLUGINS "" THEME ""
+run_hook tutor-feature-autostart
+expect "a relative saved starter is refused" out_has "unsafe saved starter path"
+set_options "$tutor_share/options.tsv" COURSE "$course" COURSE_REPO "" STARTER "" STARTER_REPO https://example.invalid/starter.git \
+    FACTORY "" SELECT_OUTLINE true DISABLE_PLUGINS "" THEME ""
+run_hook tutor-feature-autostart
+expect "a saved starterRepo without a starter is refused" out_has "unsafe saved starterRepo"
+set_options "$tutor_share/options.tsv" COURSE "$course" COURSE_REPO "" STARTER "$course" STARTER_REPO "" \
+    FACTORY "" SELECT_OUTLINE true DISABLE_PLUGINS "" THEME ""
+run_hook tutor-feature-autostart
+expect "a saved starter equal to the course is refused" out_has "saved starter is the course"
+
 # --- keep-alive ---------------------------------------------------------------
 activity="$state/.tutor-feature/activity"
 run_keepalive() {
@@ -444,11 +473,51 @@ expect "a failed clone does not fail the hook" test "$rc" = 0
 expect "a failed clone says how to recover" out_has "clone it yourself with: git clone https://example.invalid/course.git $course"
 
 reset_world
-set_options "$tutor_share/options.tsv" COURSE "/nonexistent-parent-$$/course" COURSE_REPO https://example.invalid/course.git FACTORY "" SELECT_OUTLINE true \
-    DISABLE_PLUGINS "" THEME ""
+set_options "$tutor_share/options.tsv" COURSE "/nonexistent-parent-$$/course" COURSE_REPO https://example.invalid/course.git \
+    STARTER "" STARTER_REPO "" FACTORY "" SELECT_OUTLINE true DISABLE_PLUGINS "" THEME ""
 run_hook tutor-feature-bootstrap
 expect "an unwritable parent is reported, not fatal" test "$rc" = 0
 expect "no clone is attempted into an unwritable parent" test ! -e "$fake/git.log"
+
+# The starter is cloned like the course, and independently of it.
+reset_world
+mkdir -p "$course"
+tutor_options https://example.invalid/course.git true "$default_disable" plugin:tutor:paper https://example.invalid/starter.git
+run_hook tutor-feature-bootstrap
+expect "bootstrap clones a missing starter" test "$rc" = 0
+expect "the starter clone never takes options from the URL" test "$(cat "$fake/git.log")" = "clone --quiet -- https://example.invalid/starter.git $starter"
+
+reset_world
+tutor_options https://example.invalid/course.git true "$default_disable" plugin:tutor:paper https://example.invalid/starter.git
+run_hook tutor-feature-bootstrap
+expect "a missing course and starter are both cloned" \
+    test "$(cat "$fake/git.log")" = "clone --quiet -- https://example.invalid/course.git $course"$'\n'"clone --quiet -- https://example.invalid/starter.git $starter"
+
+reset_world
+mkdir -p "$course" "$starter"
+tutor_options https://example.invalid/course.git true "$default_disable" plugin:tutor:paper https://example.invalid/starter.git
+run_hook tutor-feature-bootstrap
+expect "an existing starter is not cloned over" test ! -e "$fake/git.log"
+expect "an existing starter is logged" out_has "starter found at $starter"
+
+reset_world
+mkdir -p "$course"
+run_hook tutor-feature-bootstrap
+expect "empty starterRepo never clones" test ! -e "$fake/git.log"
+
+reset_world
+mkdir -p "$course"
+tutor_options https://example.invalid/course.git true "$default_disable" plugin:tutor:paper https://example.invalid/starter.git
+touch "$fake/git-fails"
+run_hook tutor-feature-bootstrap
+expect "a failed starter clone does not fail the hook" test "$rc" = 0
+expect "a failed starter clone says how to recover" out_has "clone it yourself with: git clone https://example.invalid/starter.git $starter"
+
+reset_world
+tutor_options https://example.invalid/course.git true "$default_disable" plugin:tutor:paper https://example.invalid/starter.git
+touch "$fake/git-fails"
+run_hook tutor-feature-bootstrap
+expect "a failed course clone still tries the starter" grep -qxF "clone --quiet -- https://example.invalid/starter.git $starter" "$fake/git.log"
 
 [ "$failures" -eq 0 ] || { echo "$failures tutor lifecycle check(s) failed" >&2; exit 1; }
 echo 'tutor hermetic lifecycle checks passed'

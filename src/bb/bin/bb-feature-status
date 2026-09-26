@@ -4,9 +4,25 @@ set -euo pipefail
 bb_feature_validate_options
 if [ "$BB_FEATURE_MODE" != standalone ]; then echo "BB Feature is in cli mode; no standalone runtime is configured."; exit 0; fi
 bb_feature_prepare_data_dir
+
+# BB can answer /health before a running autostart has recorded its launcher.
+# If autostart holds the lifecycle lock, wait (bounded by its fresh-start
+# budget) for it to finish rather than report a start in progress as not
+# ready. Open the lock read-only: status never creates or truncates it, and
+# returns at once when nobody holds it.
+wait_for_autostart() {
+    local lock_file="$BB_FEATURE_RUNTIME_DIR/autostart.lock"
+    [ -f "$lock_file" ] && [ ! -L "$lock_file" ] && [ "$(stat -c %u -- "$lock_file")" = "$(id -u)" ] || return 1
+    exec 9<"$lock_file"
+    if flock -n -s 9; then exec 9<&-; return 1; fi
+    flock -w 45 -s 9 || { exec 9<&-; return 1; }
+    exec 9<&-
+}
+
 # Startup/plugin work can briefly delay health responses. Retry both probes
 # within a short budget, without restarting or signalling the owned launcher.
-if bb_feature_owned_launcher_alive && bb_feature_wait_ready "$BB_FEATURE_PID" 8; then
+if { bb_feature_owned_launcher_alive || { wait_for_autostart && bb_feature_owned_launcher_alive; }; } \
+    && bb_feature_wait_ready "$BB_FEATURE_PID" 8; then
     echo "BB standalone is ready at $(bb_feature_origin) (server ${BB_FEATURE_SERVER_PORT}, host daemon ${BB_FEATURE_DAEMON_PORT}; both loopback)."
     exit 0
 fi

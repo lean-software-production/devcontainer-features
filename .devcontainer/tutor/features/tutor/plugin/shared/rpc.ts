@@ -1,0 +1,293 @@
+// The RPC contract between the frontend (app/) and the backend (server/rpc/).
+// The backend registers it with `bb.rpc.register(rpcContract, handlers)`; the
+// frontend calls it with `useRpc<typeof rpcContract>()` and must import this
+// module with `import type` only.
+//
+// Handlers fail by throwing an Error whose message is shown to the student
+// as-is, so write it for them ("No factory project is set up yet.").
+import { defineRpcContract } from "@get-bb/plugin-sdk";
+import { z } from "zod";
+import {
+  diffLineSchema,
+  exampleCountsSchema,
+  exampleKeySchema,
+  exampleProgressSchema,
+  lessonIdSchema,
+  lessonSchema,
+  lessonStatusSchema,
+  iterationProgressSchema,
+  lexiconEntrySchema,
+  changeSchema,
+  ruleKeySchema,
+  ruleStatusSchema,
+  threadIdSchema,
+} from "./model.ts";
+
+// ---------------------------------------------------------------------------
+// Payload pieces
+// ---------------------------------------------------------------------------
+
+/**
+ * A thread Tutor spawned or forked, as the backend knows it (live status comes
+ * from useSidebarThreads). `coach` is the lesson's coach thread. `sideChat` is
+ * one of its side chats: a hidden fork shown in its right panel, or an older
+ * side thread spawned under it before side chats existed.
+ */
+export const tutorThreadSchema = z.object({
+  id: threadIdSchema,
+  lessonId: lessonIdSchema,
+  role: z.enum(["coach", "sideChat"]),
+  ruleKey: ruleKeySchema.nullable(),
+  title: z.string().nullable(),
+  /** The coach thread it belongs to; itself for a coach thread. */
+  coachThreadId: threadIdSchema,
+  /** A hidden fork, opened in the coach thread's right panel; false for an older side thread, which is a thread of its own. */
+  fork: z.boolean(),
+});
+export type TutorThread = z.infer<typeof tutorThreadSchema>;
+
+export const factoryProjectSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("unset") }),
+  z.object({
+    status: z.literal("found"),
+    projectId: z.string(),
+    projectName: z.string(),
+    /** Absolute path of the project's default local source. */
+    root: z.string(),
+  }),
+  /** The factoryProject setting names a project that is gone or has no local source. */
+  z.object({ status: z.literal("missing"), projectId: z.string() }),
+]);
+export type FactoryProject = z.infer<typeof factoryProjectSchema>;
+
+export const courseInfoSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string().nullable(),
+});
+export type CourseInfo = z.infer<typeof courseInfoSchema>;
+
+export const ruleOutlineSchema = z.object({
+  key: ruleKeySchema,
+  name: z.string(),
+  change: changeSchema,
+  status: ruleStatusSchema,
+  isFocus: z.boolean(),
+  counts: exampleCountsSchema,
+  /** Latest `at` among its Examples' progress entries. */
+  lastAt: z.string().nullable(),
+  /** The coach has focused it in the lesson's coach thread, so its section there can be jumped to. */
+  reached: z.boolean(),
+});
+export type RuleOutline = z.infer<typeof ruleOutlineSchema>;
+
+export const featureOutlineSchema = z.object({
+  slug: z.string(),
+  name: z.string(),
+  path: z.string(),
+  change: changeSchema,
+  counts: exampleCountsSchema,
+  rules: z.array(ruleOutlineSchema),
+});
+export type FeatureOutline = z.infer<typeof featureOutlineSchema>;
+
+export const lessonSummarySchema = z.object({
+  id: lessonIdSchema,
+  title: z.string(),
+  set: z.string().nullable(),
+  builtin: z.boolean(),
+  status: lessonStatusSchema,
+  /** Recorded progress: the current lesson's, a done one's history entry, else all pending. */
+  counts: exampleCountsSchema,
+  /** The lesson's coach thread, or null before it has one. */
+  coachThreadId: threadIdSchema.nullable(),
+  /** Its features and Rules, for the course outline. */
+  outline: z.array(featureOutlineSchema),
+});
+export type LessonSummary = z.infer<typeof lessonSummarySchema>;
+
+export const lastNoteSchema = z.object({
+  exampleKey: exampleKeySchema,
+  exampleName: z.string(),
+  note: z.string(),
+  at: z.string(),
+});
+
+export const currentStateSchema = z.object({
+  lessonId: lessonIdSchema,
+  iterationStatus: iterationProgressSchema,
+  focus: ruleKeySchema.nullable(),
+  focusRuleName: z.string().nullable(),
+  counts: exampleCountsSchema,
+  outline: z.array(featureOutlineSchema),
+  coachThreadId: threadIdSchema.nullable(),
+  /** The most recent not-yet note, for "Last time: …" on BB home. */
+  lastNote: lastNoteSchema.nullable(),
+});
+export type CurrentState = z.infer<typeof currentStateSchema>;
+
+/** Everything the outline, the home section and the first-run page need in one call. */
+export const overviewSchema = z.object({
+  course: courseInfoSchema.nullable(),
+  /** Why the course could not be loaded (course is then null). */
+  courseError: z.string().nullable(),
+  factoryProject: factoryProjectSchema,
+  lessons: z.array(lessonSummarySchema),
+  /** Null while the course is missing or there is no factory project. */
+  current: currentStateSchema.nullable(),
+  threads: z.array(tutorThreadSchema),
+});
+export type Overview = z.infer<typeof overviewSchema>;
+
+export const lessonDetailSchema = z.object({
+  lesson: lessonSchema,
+  status: lessonStatusSchema,
+  /** The student's iteration status when this is the current lesson, else null. */
+  iterationStatus: iterationProgressSchema.nullable(),
+  focus: ruleKeySchema.nullable(),
+  /**
+   * Recorded progress: the current PROGRESS.yaml, or its `history` entry for a done lesson.
+   * Empty for lessons ahead (a preview) and for done lessons finished before history was kept.
+   */
+  progress: z.record(exampleKeySchema, exampleProgressSchema),
+  coachThreadId: threadIdSchema.nullable(),
+  /** Rules the coach has focused in that thread: their sections can be jumped to. */
+  reachedRules: z.array(ruleKeySchema),
+});
+export type LessonDetail = z.infer<typeof lessonDetailSchema>;
+
+export const completionSchema = z.object({
+  lesson: z.object({ id: lessonIdSchema, title: z.string(), set: z.string().nullable() }),
+  counts: exampleCountsSchema,
+  /** Rules that are new or reworded. */
+  freshRules: z.number().int().nonnegative(),
+  /** Side chats (and older side threads) of the lesson's coach thread. */
+  sideChats: z.number().int().nonnegative(),
+  adoptedAt: z.string().nullable(),
+  summary: z.string().nullable(),
+  next: z
+    .object({
+      id: lessonIdSchema,
+      /** "ahead" until the student starts it; then the page continues it instead. */
+      status: lessonStatusSchema,
+      title: z.string(),
+      set: z.string().nullable(),
+      dek: z.string(),
+      rules: z.number().int().nonnegative(),
+      examples: z.number().int().nonnegative(),
+      /** Examples whose hash matches one the student has passing now. */
+      carryOver: z.number().int().nonnegative(),
+      fresh: z.number().int().nonnegative(),
+      factoryDiff: z.array(diffLineSchema).nullable(),
+    })
+    .nullable(),
+});
+export type Completion = z.infer<typeof completionSchema>;
+
+export const candidateProjectSchema = z.object({
+  projectId: z.string(),
+  name: z.string(),
+  root: z.string().nullable(),
+  /** Looks like a factory (has ITERATION or spec/ITERATION, or an AGENTS.md naming the coach). */
+  qualifies: z.boolean(),
+  /** One line for the picker: "ITERATION · 001 WIP", "no ITERATION". */
+  detail: z.string(),
+});
+export type CandidateProject = z.infer<typeof candidateProjectSchema>;
+
+/** Payload of the REALTIME_CHANNELS.stateChanged signal. */
+export const stateChangedSignalSchema = z.object({
+  reason: z.enum(["progress", "iteration", "factoryProject", "threads", "course"]),
+  lessonId: lessonIdSchema.nullable(),
+});
+export type StateChangedSignal = z.infer<typeof stateChangedSignalSchema>;
+
+// ---------------------------------------------------------------------------
+// Contract
+// ---------------------------------------------------------------------------
+
+const lessonInput = z.object({ lessonId: lessonIdSchema });
+
+export const rpcContract = defineRpcContract({
+  getOverview: {
+    input: z.null(),
+    output: overviewSchema,
+  },
+  getLessonDetail: {
+    input: lessonInput,
+    output: lessonDetailSchema,
+  },
+  /** Between lessons (screen 7). Fails unless the lesson is done. */
+  getCompletion: {
+    input: lessonInput,
+    output: completionSchema,
+  },
+  /** For the rule tab: null unless the thread is Tutor's, or a side chat BB made of a coach thread. */
+  getThreadContext: {
+    input: z.object({ threadId: threadIdSchema }),
+    output: z.object({ thread: tutorThreadSchema.nullable() }),
+  },
+  getLexicon: {
+    input: z.null(),
+    output: z.object({ entries: z.array(lexiconEntrySchema) }),
+  },
+  listCandidateProjects: {
+    input: z.null(),
+    output: z.object({ projects: z.array(candidateProjectSchema) }),
+  },
+  /** Stores the factoryProject setting. Never creates a project. */
+  confirmFactory: {
+    input: z.object({ projectId: z.string().min(1).max(128) }),
+    output: factoryProjectSchema,
+  },
+  /** Finds the lesson's coach thread, or spawns it. Current or done lessons only. */
+  openCoach: {
+    input: lessonInput,
+    output: z.object({ threadId: threadIdSchema, created: z.boolean() }),
+  },
+  /**
+   * Spawns the coach thread for the lesson after a Done one; its first turn
+   * adopts the spec (tutor_adopt_iteration). Fails for any other lesson.
+   */
+  startNextLesson: {
+    input: lessonInput,
+    output: z.object({ threadId: threadIdSchema }),
+  },
+  /**
+   * A BB side chat of the lesson's coach thread, optionally about one
+   * Rule: a hidden fork, plus BB's "Side chat" tab in the coach thread's right
+   * panel. A plugin cannot select that tab, so the frontend points to it.
+   */
+  startSideChat: {
+    input: z.object({ lessonId: lessonIdSchema, ruleKey: ruleKeySchema.nullable() }),
+    output: z.object({ coachThreadId: threadIdSchema, sideChatId: threadIdSchema }),
+  },
+  /**
+   * Puts a side chat's tab back in its coach thread's right panel if it was
+   * closed. The side chat must be a hidden fork of a Tutor coach thread
+   * (Tutor's, or one BB made with "Reply in side chat").
+   */
+  ensureSideChatTab: {
+    input: z.object({ sideChatId: threadIdSchema }),
+    output: z.object({ coachThreadId: threadIdSchema }),
+  },
+  /**
+   * The student asked for a Rule (the Rule tab's "Work on this Rule next"):
+   * send the coach thread a message asking to move there. The coach
+   * moves the focus (tutor_focus_rule), not the UI.
+   */
+  redirectFocus: {
+    input: z.object({ lessonId: lessonIdSchema, ruleKey: ruleKeySchema }),
+    output: z.object({ threadId: threadIdSchema }),
+  },
+  /**
+   * The student is using BB (app/activity.ts). Stamps the tutor feature's
+   * activity file, at most every 30 s; `recorded` is false when throttled or
+   * when BB's data dir is unknown.
+   */
+  heartbeat: {
+    input: z.null(),
+    output: z.object({ recorded: z.boolean() }),
+  },
+});
+export type RpcContract = typeof rpcContract;

@@ -1,0 +1,67 @@
+{
+  // Codespace entry point for the Tutor course: a private, loopback-only BB
+  // with the Tutor plugin, the Claude Code, Codex and Pi agent CLIs, and the
+  // public tutorial and capstone-project-starter cloned next to this repo; the
+  // student's factory is the starter's tetris/.factory. The Features are
+  // local copies of src/*; refresh them with
+  // .devcontainer/tutor/sync-features.sh (see README.md here).
+  "name": "Tutor course (BB standalone + Tutor)",
+  // Node 24 comes from the image: the bb Feature runs BB with a fixed system
+  // PATH, which sees this image's /usr/local/bin/node, and the agent Features
+  // link their CLIs into /usr/local/bin, which BB's PATH includes.
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie",
+  "features": {
+    "./features/bb": {
+      "version": "0.43.4",
+      "mode": "standalone",
+      "autoStart": true,
+      "serverPort": "38886",
+      "hostDaemonPort": "38887",
+      "dataDir": "/workspaces/.bb-state",
+      "appUrl": "auto"
+    },
+    // No credentials are installed: students sign in to an agent from BB or
+    // by running claude, codex or pi in a terminal.
+    "./features/claude-code": {},
+    "./features/codex": {},
+    "./features/pi": {},
+    "./features/tutor": {
+      "course": "/workspaces/tutorial",
+      "courseRepo": "https://github.com/lean-software-production/tutorial.git",
+      "starter": "/workspaces/capstone-project-starter",
+      "starterRepo": "https://github.com/lean-software-production/capstone-project-starter.git",
+      "factory": "/workspaces/capstone-project-starter/tetris/.factory",
+      "selectOutline": true
+    }
+  },
+  // Local Features cannot use the published bb id in installsAfter, so the
+  // order is pinned here: tutor builds its plugin with bb's packaged CLI, and
+  // goes last because it changes most often. The agent CLIs do not depend on
+  // bb or tutor; BB finds them on PATH when it runs.
+  "overrideFeatureInstallOrder": [
+    "./features/bb",
+    "./features/claude-code",
+    "./features/codex",
+    "./features/pi",
+    "./features/tutor"
+  ],
+  // GitHub stops a Codespace after its idle timeout, and using BB through the
+  // forwarded port does not count as activity. While BB is in use this prints
+  // a line in the attach terminal, which does (best effort; see
+  // src/tutor/NOTES.md). The object form runs it beside any other attach
+  // command. Outside Codespaces it returns at once.
+  "postAttachCommand": {
+    "tutor-keepalive": "tutor-keepalive"
+  },
+  "forwardPorts": [38886],
+  "portsAttributes": {
+    "38886": {
+      "label": "BB (Tutor)",
+      "protocol": "http",
+      "onAutoForward": "notify"
+    }
+  },
+  "otherPortsAttributes": {
+    "onAutoForward": "ignore"
+  }
+}

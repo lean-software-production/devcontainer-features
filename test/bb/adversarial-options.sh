@@ -24,7 +24,7 @@ expect_reject 'appUrl with a path' APPURL='https://x.invalid/not-an-origin'
 expect_reject 'invalid port' SERVERPORT=not-a-port
 expect_reject 'colliding ports' SERVERPORT=48886 HOSTDAEMONPORT=48886
 expect_reject 'bad mode' MODE=server
-expect_reject 'unvalidated version' VERSION='0.43.3;id'
+expect_reject 'unvalidated version' VERSION='0.43.4;id'
 test ! -e "$tmp/pwned"
 
 # This direct helper check remains runnable without the root-owned Feature

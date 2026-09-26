@@ -1,0 +1,416 @@
+/*
+ * The course outline (revises mockup 1B): one tree of lessons, each with its
+ * coach thread, the coach thread's Rules and its side chats. Fills BB's
+ * sidebar scroll area.
+ */
+
+.tutor-paper.tp-outline {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: 16px 12px 18px;
+  background: var(--tp-outline);
+  font-size: 13px;
+}
+.tutor-paper.tp-outline a {
+  color: inherit;
+  text-decoration: none;
+}
+.tutor-paper.tp-outline button {
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+.tutor-paper.tp-outline :focus-visible {
+  outline: 2px solid var(--tp-blue);
+  outline-offset: 1px;
+}
+
+.tutor-paper .tp-outline-brand {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  margin-bottom: 16px;
+  color: #33404b;
+  font-size: 0.68rem;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+.tutor-paper .tp-brand-mark {
+  display: grid;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--tp-blue);
+  color: #fff;
+  font-size: 12px;
+}
+
+/* ---- the tree: lessons ---- */
+.tutor-paper.tp-outline .tp-tree {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tutor-paper.tp-outline .tp-lesson-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 6px 7px 2px;
+  border-radius: 7px;
+  color: #3d4a55;
+}
+.tutor-paper.tp-outline .tp-lesson-head:hover {
+  background: rgb(255 255 255 / 0.45);
+}
+.tutor-paper .tp-caret {
+  flex: none;
+  width: 10px;
+  color: #8d8b82;
+  font-size: 0.6rem;
+  line-height: 1.5rem;
+}
+.tutor-paper .tp-lesson-mark {
+  flex: none;
+  width: 12px;
+  color: var(--tp-todo);
+  font-size: 0.7rem;
+  line-height: 1.5rem;
+  text-align: center;
+}
+.tutor-paper .tp-lesson--done .tp-lesson-mark {
+  color: var(--tp-green);
+}
+.tutor-paper .tp-lesson--current .tp-lesson-mark {
+  color: var(--tp-blue);
+}
+.tutor-paper .tp-lesson-text {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+  min-width: 0;
+}
+.tutor-paper .tp-lesson-title {
+  font: 500 0.92rem/1.25 var(--tp-font-display);
+  letter-spacing: -0.01em;
+}
+.tutor-paper .tp-lesson-title .tp-n {
+  color: #8d8b82;
+  font: 500 0.64rem var(--tp-font-mono);
+  letter-spacing: 0;
+}
+.tutor-paper .tp-lesson--current .tp-lesson-title {
+  color: var(--tp-blue-ink);
+  font-weight: 600;
+}
+.tutor-paper .tp-lesson--ahead .tp-lesson-title {
+  color: #6b7179;
+}
+.tutor-paper .tp-lesson--viewed > .tp-lesson-head {
+  background: rgb(255 255 255 / 0.6);
+}
+.tutor-paper .tp-lesson-meter {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.tutor-paper .tp-lesson-bar {
+  flex: 1;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: #e2ded2;
+}
+.tutor-paper .tp-lesson-bar i {
+  display: block;
+  height: 100%;
+  background: var(--tp-green);
+}
+.tutor-paper .tp-lesson-count {
+  flex: none;
+  color: #8d8b82;
+  font: 500 0.6rem var(--tp-font-mono);
+}
+.tutor-paper .tp-lesson-body {
+  display: grid;
+  gap: 1px;
+  margin: 0 0 8px 16px;
+}
+
+/* ---- the tree: the coach thread's Rules ---- */
+.tutor-paper .tp-rules {
+  display: grid;
+  gap: 1px;
+  margin: 0 0 4px 14px;
+}
+.tutor-paper.tp-outline .tp-feat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 6px 2px 2px;
+  color: #6b7179;
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.tutor-paper .tp-rrow {
+  display: flex;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  color: #56616c;
+  font-size: 0.68rem;
+  line-height: 1.22;
+}
+.tutor-paper a.tp-rrow:hover {
+  background: rgb(255 255 255 / 0.5);
+}
+.tutor-paper .tp-rrow .tp-g {
+  flex: none;
+  width: 10px;
+  text-align: center;
+}
+.tutor-paper .tp-rrow .tp-rname {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.tutor-paper .tp-rrow--passing .tp-g {
+  color: var(--tp-green);
+}
+.tutor-paper .tp-rrow--not-yet .tp-g {
+  color: var(--tp-amber);
+}
+.tutor-paper .tp-rrow--pending .tp-g {
+  color: var(--tp-todo);
+}
+.tutor-paper .tp-rrow--focus {
+  background: rgb(255 255 255 / 0.6);
+  color: var(--tp-blue-ink);
+  font-weight: 750;
+}
+.tutor-paper .tp-rrow--focus .tp-g {
+  color: var(--tp-blue);
+}
+/* Not reached yet: no section to jump to. Muted, still 4.5:1 on the outline. */
+.tutor-paper .tp-rrow--unreached {
+  color: #6f757b;
+  font-weight: 400;
+  cursor: default;
+}
+.tutor-paper .tp-rrow--unreached .tp-g {
+  opacity: 0.7;
+}
+
+/* ---- separators and thread rows ---- */
+.tutor-paper .tp-sep {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 16px 0 6px;
+  padding-top: 12px;
+  border-top: 1px solid #d7d3c6;
+  color: #77776f;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.tutor-paper.tp-outline .tp-sep-action {
+  padding: 0 4px;
+  border-radius: 4px;
+  color: #77776f;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+.tutor-paper.tp-outline .tp-sep-action:hover {
+  background: rgb(255 255 255 / 0.6);
+  color: var(--tp-ink);
+}
+.tutor-paper .tp-th {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 4px 7px;
+  border-radius: 6px;
+  color: #3d4a55;
+  font-size: 0.69rem;
+  line-height: 1.2;
+}
+.tutor-paper .tp-th:hover {
+  background: rgb(255 255 255 / 0.45);
+}
+.tutor-paper .tp-th .tp-ic {
+  display: grid;
+  flex: none;
+  width: 15px;
+  height: 15px;
+  place-items: center;
+  border: 1px solid #d7d3c6;
+  border-radius: 4px;
+  background: #fff;
+  color: #59616a;
+  font-size: 0.55rem;
+}
+.tutor-paper .tp-th--coach .tp-ic {
+  border-color: var(--tp-green);
+  background: var(--tp-green);
+  color: #fff;
+}
+.tutor-paper .tp-th .tp-t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tutor-paper .tp-th--nest {
+  width: calc(100% - 14px);
+  margin-left: 14px;
+}
+.tutor-paper .tp-th--on,
+.tutor-paper .tp-th--on:hover {
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.07);
+  color: var(--tp-blue-ink);
+  font-weight: 700;
+}
+.tutor-paper .tp-th--start,
+.tutor-paper .tp-th--page {
+  color: var(--tp-blue-ink);
+  font-weight: 700;
+}
+.tutor-paper .tp-th--side {
+  align-items: flex-start;
+}
+.tutor-paper .tp-th--side .tp-ic {
+  border-color: transparent;
+  background: none;
+}
+.tutor-paper .tp-side-text {
+  display: grid;
+  min-width: 0;
+}
+.tutor-paper .tp-cap {
+  overflow: hidden;
+  color: #6f757b;
+  font-size: 0.58rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tutor-paper .tp-th--ask {
+  color: #56616c;
+}
+.tutor-paper .tp-th--ask .tp-ic {
+  border-style: dashed;
+}
+
+/* Indicator dots drawn from PluginSidebarThread.indicator. */
+.tutor-paper .tp-ind {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  border-radius: 50%;
+}
+.tutor-paper .tp-ind--working {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgb(34 197 94 / 0.16);
+  animation: tp-pulse 1.6s ease-in-out infinite;
+}
+.tutor-paper .tp-ind--unread {
+  background: var(--tp-blue);
+}
+.tutor-paper .tp-ind--attention {
+  background: var(--tp-amber);
+  box-shadow: 0 0 0 3px rgb(139 90 0 / 0.16);
+}
+.tutor-paper .tp-ind--error {
+  background: var(--tp-red);
+}
+.tutor-paper .tp-ind--queued {
+  border: 1.5px solid #8d8b82;
+  background: transparent;
+}
+@keyframes tp-pulse {
+  50% {
+    box-shadow: 0 0 0 5px rgb(34 197 94 / 0.05);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tutor-paper .tp-ind--working {
+    animation: none;
+  }
+}
+
+.tutor-paper .tp-other-project {
+  padding: 6px 7px 2px;
+  color: #8d8b82;
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+.tutor-paper.tp-outline .tp-outline-more {
+  padding: 4px 7px;
+  color: var(--tp-blue);
+  font-size: 0.66rem;
+  font-weight: 650;
+}
+
+/* ---- no factory project / loading / error ---- */
+.tutor-paper .tp-lesson-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  color: #59616a;
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+.tutor-paper .tp-lesson-row .tp-n {
+  color: #8d8b82;
+  font-family: var(--tp-font-mono);
+  font-size: 0.64rem;
+}
+.tutor-paper .tp-lesson-row .tp-gl-mark {
+  width: 10px;
+  color: var(--tp-todo);
+  text-align: center;
+}
+.tutor-paper .tp-setup-card {
+  display: block;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid #b6cce9;
+  border-radius: 10px;
+  background: var(--tp-blue-pale);
+  color: var(--tp-blue-ink);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.tutor-paper .tp-outline-note {
+  display: block;
+  margin: 4px 0;
+  padding: 4px 7px;
+  color: var(--tp-muted);
+  font-size: 0.68rem;
+}
+.tutor-paper .tp-outline-note--error {
+  border-left: 3px solid var(--tp-red);
+  color: #7a2a2a;
+}
+/* The outline resets its buttons; Reload stays the paper's blue button. */
+.tutor-paper.tp-outline .tp-outline-note .tp-reload {
+  border: 1px solid #1d4c91;
+  background: var(--tp-blue);
+  color: #fff;
+}

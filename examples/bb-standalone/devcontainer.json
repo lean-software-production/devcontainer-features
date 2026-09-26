@@ -3,7 +3,7 @@
   "image": "mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie",
   "features": {
     "./features/bb": {
-      "version": "0.43.3",
+      "version": "0.43.4",
       "mode": "standalone",
       "autoStart": true,
       "dataDir": "${containerWorkspaceFolder}/.bb-state",

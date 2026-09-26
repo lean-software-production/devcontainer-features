@@ -99,7 +99,7 @@ chmod 755 "$share/npm/bin/bb-app"
 write_options() {
   local port="$1" daemon="$2" app_url="$3" data_dir="$4"
   cat > "$share/options.tsv" <<EOF
-VERSION	0.43.3
+VERSION	0.43.4
 MODE	standalone
 AUTOSTART	true
 SERVER_PORT	$port

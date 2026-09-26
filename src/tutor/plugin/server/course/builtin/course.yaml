@@ -1,0 +1,6 @@
+# Tutor's built-in course. Its one lesson is prepended to every course as
+# Lesson 0; the id "000" is reserved for it.
+id: tutor
+title: Using your tutor
+lessons:
+  - { id: "000", title: Using your tutor, set: Start here, dir: lesson-0 }

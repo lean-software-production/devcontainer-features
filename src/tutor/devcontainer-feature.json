@@ -1,0 +1,58 @@
+{
+  "id": "tutor",
+  "version": "0.4.0",
+  "name": "Tutor coached course for BB",
+  "description": "Adds the Tutor BB plugin to the bb Feature's standalone server: a course outline in the sidebar and a coach thread per lesson that works one Gherkin Rule at a time. Requires the bb Feature in standalone mode.",
+  "documentationURL": "https://github.com/lean-software-production/devcontainer-features/tree/main/src/tutor",
+  "options": {
+    "course": {
+      "type": "string",
+      "default": "/workspaces/tutorial",
+      "description": "Absolute path of the course checkout the plugin reads."
+    },
+    "courseRepo": {
+      "type": "string",
+      "proposals": ["https://github.com/lean-software-production/tutorial.git", ""],
+      "default": "https://github.com/lean-software-production/tutorial.git",
+      "description": "HTTPS Git URL cloned into 'course' after the container is created, if 'course' does not exist yet. Empty never clones."
+    },
+    "starter": {
+      "type": "string",
+      "default": "",
+      "description": "Optional absolute path of the student's capstone-project-starter checkout, which holds the factory (for example /workspaces/capstone-project-starter). Must differ from 'course'. Empty means no starter."
+    },
+    "starterRepo": {
+      "type": "string",
+      "proposals": ["https://github.com/lean-software-production/capstone-project-starter.git", ""],
+      "default": "",
+      "description": "HTTPS Git URL cloned into 'starter' after the container is created, if 'starter' does not exist yet. Needs 'starter'. Empty never clones."
+    },
+    "factory": {
+      "type": "string",
+      "default": "",
+      "description": "Optional absolute path of the student's factory: the folder holding spec/ and ITERATION, such as <starter>/tetris/.factory. When it exists it is registered as a BB project, and the plugin pre-selects it."
+    },
+    "selectOutline": {
+      "type": "boolean",
+      "default": true,
+      "description": "Select the Tutor course outline as BB's sidebar thread list once, unless another thread list was chosen already."
+    },
+    "disablePlugins": {
+      "type": "string",
+      "proposals": [
+        "automations,workflows,tasks,scheduled-send,github,browser-automation,agent-annotations,connect,plugin-api-docs,plugin-api-tester,theme-preview,keep-awake,account-pool,environment-modal-sandbox",
+        ""
+      ],
+      "default": "automations,workflows,tasks,scheduled-send,github,browser-automation,agent-annotations,connect,plugin-api-docs,plugin-api-tester,theme-preview,keep-awake,account-pool,environment-modal-sandbox",
+      "description": "Comma-separated BB plugin ids to switch off once per BB state directory, so a student can turn any back on. Plugins that are not installed are skipped; tutor, thread-list, provider-* and the workspace environments are never switched off. Empty switches off nothing."
+    },
+    "theme": {
+      "type": "string",
+      "proposals": ["plugin:tutor:paper", ""],
+      "default": "plugin:tutor:paper",
+      "description": "BB theme id to select once per BB state directory, only while BB's default theme is active. Empty leaves BB's theme alone."
+    }
+  },
+  "postCreateCommand": "/usr/local/share/tutor/bin/tutor-feature-bootstrap",
+  "postStartCommand": "/usr/local/share/tutor/bin/tutor-feature-autostart"
+}

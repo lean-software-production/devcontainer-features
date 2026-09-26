@@ -31,6 +31,14 @@ expect_reject 'dot traversal in course' 'course must be' COURSE=/workspaces/../e
 expect_reject 'command substitution in factory' 'factory must be' FACTORY='/tmp/$(id)'
 expect_reject 'relative factory' 'factory must be' FACTORY=my-factory
 expect_reject 'factory equals course' 'must be different' COURSE=/workspaces/x FACTORY=/workspaces/x/
+expect_reject 'relative starter' 'starter must be' STARTER=capstone-project-starter
+# shellcheck disable=SC2016 # the literal text is the attack
+expect_reject 'command substitution in starter' 'starter must be' STARTER='/tmp/$(id)'
+expect_reject 'starter equals course' 'starter and course must be different' COURSE=/workspaces/x STARTER=/workspaces/x/
+expect_reject 'starterRepo without starter' 'starterRepo needs a starter' STARTERREPO=https://github.com/lean-software-production/capstone-project-starter.git
+expect_reject 'plain http starterRepo' 'starterRepo must be' STARTER=/workspaces/s STARTERREPO=http://github.com/lean-software-production/capstone-project-starter.git
+expect_reject 'option injection in starterRepo' 'starterRepo must be' STARTER=/workspaces/s STARTERREPO='--upload-pack=touch pwned'
+expect_reject 'credentials in starterRepo' 'no credentials' STARTER=/workspaces/s STARTERREPO=https://user:secret@github.com/x/y.git
 expect_reject 'bad selectOutline' 'selectOutline must be' SELECTOUTLINE=yes
 expect_reject 'ssh courseRepo' 'courseRepo must be' COURSEREPO=git@github.com:lean-software-production/tutorial.git
 expect_reject 'plain http courseRepo' 'courseRepo must be' COURSEREPO=http://github.com/lean-software-production/tutorial.git
@@ -45,11 +53,14 @@ expect_reject 'space in theme' 'theme must be' THEME='my theme'
 test ! -e "$tmp/pwned"
 test ! -e pwned
 
-# Valid options, including an empty courseRepo, pass validation and stop only
+# Valid options, including an empty courseRepo and a starter, pass validation and stop only
 # at the missing bb Feature.
 expect_reject 'defaults without the bb Feature' 'the bb Feature must be installed first'
 expect_reject 'explicit options without the bb Feature' 'the bb Feature must be installed first' \
     COURSE=/workspaces/course/ COURSEREPO= FACTORY=/workspaces/my-factory SELECTOUTLINE=false DISABLEPLUGINS= THEME=
+expect_reject 'the starter layout without the bb Feature' 'the bb Feature must be installed first' \
+    STARTER=/workspaces/capstone-project-starter/ STARTERREPO=https://github.com/lean-software-production/capstone-project-starter.git \
+    FACTORY=/workspaces/capstone-project-starter/tetris/.factory
 expect_reject 'plugin list and theme without the bb Feature' 'the bb Feature must be installed first' \
     DISABLEPLUGINS=automations,tutor,provider-codex THEME=nord
 echo 'tutor adversarial option validation passed'

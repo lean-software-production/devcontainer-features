@@ -34,6 +34,8 @@
       "tutor": {
         "course": "/home/node/absent-course",
         "courseRepo": "",
+        "starter": "/home/node/absent-starter",
+        "starterRepo": "",
         "selectOutline": false,
         "disablePlugins": "",
         "theme": ""

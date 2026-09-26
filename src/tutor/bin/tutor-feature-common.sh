@@ -71,6 +71,8 @@ tutor_theme_id() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9:._-]*$ ]]; }
 tutor_validate_options() {
     TUTOR_COURSE="$(tutor_option COURSE)"
     TUTOR_COURSE_REPO="$(tutor_option COURSE_REPO)"
+    TUTOR_STARTER="$(tutor_option STARTER)"
+    TUTOR_STARTER_REPO="$(tutor_option STARTER_REPO)"
     TUTOR_FACTORY="$(tutor_option FACTORY)"
     TUTOR_SELECT_OUTLINE="$(tutor_option SELECT_OUTLINE)"
     TUTOR_DISABLE_PLUGINS="$(tutor_option DISABLE_PLUGINS)"
@@ -78,6 +80,9 @@ tutor_validate_options() {
     tutor_safe_path "$TUTOR_COURSE" || { tutor_fail "unsafe saved course path"; return 1; }
     [ -z "$TUTOR_FACTORY" ] || tutor_safe_path "$TUTOR_FACTORY" || { tutor_fail "unsafe saved factory path"; return 1; }
     [ -z "$TUTOR_COURSE_REPO" ] || { [[ "$TUTOR_COURSE_REPO" = https://* ]] && ! bb_feature_unsafe "$TUTOR_COURSE_REPO"; } || { tutor_fail "unsafe saved courseRepo"; return 1; }
+    [ -z "$TUTOR_STARTER" ] || tutor_safe_path "$TUTOR_STARTER" || { tutor_fail "unsafe saved starter path"; return 1; }
+    [ "$TUTOR_STARTER" != "$TUTOR_COURSE" ] || { tutor_fail "the saved starter is the course"; return 1; }
+    [ -z "$TUTOR_STARTER_REPO" ] || { [ -n "$TUTOR_STARTER" ] && [[ "$TUTOR_STARTER_REPO" = https://* ]] && ! bb_feature_unsafe "$TUTOR_STARTER_REPO"; } || { tutor_fail "unsafe saved starterRepo"; return 1; }
     case "$TUTOR_SELECT_OUTLINE" in true|false) ;; *) tutor_fail "invalid saved selectOutline"; return 1 ;; esac
     tutor_plugin_list "$TUTOR_DISABLE_PLUGINS" || { tutor_fail "invalid saved disablePlugins"; return 1; }
     [ -z "$TUTOR_THEME" ] || tutor_theme_id "$TUTOR_THEME" || { tutor_fail "invalid saved theme"; return 1; }

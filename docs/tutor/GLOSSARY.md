@@ -20,9 +20,10 @@ should all use these names. Where a course's own files keep an older word, the t
   `FACTORY.md` and Gherkin `.feature` files. Lessons are numbered `000`, `001`, and so on.
   Lesson 0 is built into the Tutor and teaches the interface. A lesson is *done*, *current* or
   *ahead*. Say "lesson" in the UI, the docs and the coach's messages. It replaces "homework".
-  "Iteration" survives only where coach-me already uses it: `docs/iterations/`, `spec/ITERATION`,
-  and the `tutor_adopt_iteration` / `tutor_complete_iteration` tools. The course repo's own README
-  and `coach-me.md` say "homework".
+  "Iteration" survives only where the course and the starter already use it: `docs/iterations/`,
+  the factory's `ITERATION` file, the starter's `fetch-iteration` skill, and the
+  `tutor_adopt_iteration` / `tutor_complete_iteration` tools. The course repo's own README and the
+  starter's `coach-me` skill say "homework".
 
 - **Feature** — A Gherkin `Feature:` in a lesson's `.feature` file: a group of Rules. The
   outline shows each one as a small label above its Rules. It's unrelated to devcontainer features
@@ -75,9 +76,12 @@ should all use these names. Where a course's own files keep an older word, the t
   open the coach thread instead. It replaces the "lesson page", which used to embed the coach
   chat below the lesson.
 
-- **Factory** — The student's own repo, where they build their software factory, registered as a
-  BB project. The coach threads live in it, and so does the progress file. Its BB project is the
-  *factory project* (the `factoryProject` setting).
+- **Factory** — The folder where the student builds their software factory, registered as a BB
+  project. In the capstone starter it is `tetris/.factory` in the student's fork of
+  `capstone-project-starter`: the fork is the repo, and the factory's parent, `tetris/`, is the
+  codebase the factory builds, with the sample seed in `tetris/seeds/`. The factory holds
+  `ITERATION`, `spec/` and the fetched `stand-ins/`. The coach threads live in it, and so does the
+  progress file. Its BB project is the *factory project* (the `factoryProject` setting).
 
 - **Progress file** — `spec/PROGRESS.yaml` in the factory: each Example's status, its evidence
   and its history. It belongs to the student, so it travels with their repo.

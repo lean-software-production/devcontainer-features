@@ -7,7 +7,7 @@ and it pins down every contract between them. [`DESIGN.md`](DESIGN.md) says what
 tree), lesson **2A** (now the lesson card leading the coach thread in BB's own thread view), coach
 moments **3A**, and example states **6B** (now also the Rule card). Choice buttons (3B) are not
 built. Words follow [`GLOSSARY.md`](GLOSSARY.md), in the code as in the prose; the course repo's
-`docs/iterations/`, `spec/ITERATION`, PROGRESS.yaml's `iteration` key and the
+`docs/iterations/`, the factory's `ITERATION`, PROGRESS.yaml's `iteration` key and the
 `tutor_*_iteration` tools keep the course's own word.
 
 The plugin is `src/tutor/plugin` (npm `bb-plugin-tutor`, plugin id `tutor`). It targets bb-app
@@ -124,7 +124,10 @@ imports only that file. `loadCourse(coursePath)` works as follows:
    `Iteration` column is the id, the `Spec` link text is the title and its target's directory is
    `dir`, and the optional `Set after` column is `set`. Then `id` is `slugify(basename(coursePath))`, `title` is the
    course README's first `#` heading (or the id), `description` is null, `coach` is
-   `.agents/coach-me.md` if it exists, and `lexicon` is `docs/lexicon.yaml` if it exists.
+   `.agents/coach-me.md` if it exists, and `lexicon` is `docs/lexicon.yaml` if it exists. A course
+   with no coach file of its own (the tutorial dropped `.agents/coach-me.md`) is coached with the
+   capstone starter's skill instead: `server/coach/coach-file.ts` falls back to
+   `<realpath(factory)>/../.agents/skills/coach-me/SKILL.md` when that file exists.
 3. **Lesson 0** ("Using your tutor", id `000`, set `Start here`, `builtin: true`) comes first. Its
    content lives in `server/course/builtin/`: a `course.yaml` naming `lesson-0/`, which holds
    `README.md`, `features/*.feature` and a short `FACTORY.md`. Find its directory from `import.meta.url`, not the working directory. Its
@@ -174,8 +177,18 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
 
 ### Student state (BACKEND implements `ProgressStore` in `server/progress/`)
 
-- **`spec/ITERATION`** is one line, `NNN WIP` or `NNN Done`. It is canonical (decision 1) and is
-  never written for Lesson 0.
+The factory follows the layout of `lean-software-production/capstone-project-starter`: the
+student's fork is the Git repo, `tetris/` is the codebase the factory builds, and `tetris/.factory`
+is the factory, the coach's working folder and the BB project. The factory holds `ITERATION`,
+`spec/` (the adopted lesson and `PROGRESS.yaml`) and the fetched, gitignored `stand-ins/`; the
+sample seed lives beside it, in `tetris/seeds/tetris.md`. Tutor's adoption leaves the same files
+in the same places as the starter's `fetch-iteration` skill (`fetch.sh`), from the course checkout
+on this machine, so a student can move between the two.
+
+- **`ITERATION`**, at the factory root, is one line, `NNN WIP` or `NNN Done`. It is canonical
+  (decision 1) and is never written for Lesson 0. Factories from before the starter layout kept it
+  in `spec/ITERATION`: it is read when there is no root file, and removed once the root one is
+  written, but only when `spec/` is a real folder, never through a symbolic link.
 - **`spec/PROGRESS.yaml`** follows `progressFileSchema`. It extends the design with four additive
   fields: `adopted` (when the iteration was adopted), `summary` (the coach's text from
   `tutor_complete_iteration`), per Example `carriedFrom`, and `history`: on adopt, the previous
@@ -269,8 +282,8 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
   | `tutor_status` | Current lesson, focus, and each Rule's Examples with key, status and name | Compact text the coach can act on, listing keys |
   | `tutor_focus_rule` | Sets `focus` and records the Rule as reached. Coach thread only; side chats get `isError` | The Rule card, a `formatProgressCard({ kind: "focus", … })` line to put at the top of the next message |
   | `tutor_mark_example` | Sets one Example's status; `evidence` is required for passing and `note` for not-yet (the schema enforces this) | The matching `::tutor-progress` line: `rule-passing` when the Rule just went all-green, otherwise `example-passing` or `not-yet` |
-  | `tutor_adopt_iteration` | Only the caller's own lesson, and only the lesson after a Done one, or the first. Copies README.md, FACTORY.md and features/ into `spec/` exactly (staged in `spec/.tutor-adopting/` and swapped in only once all copied, the old files moved aside into `spec/.tutor-previous/` meanwhile, so a lesson missing README.md or its features leaves the previous snapshot intact; the old files are deleted only once the swap finished or all are back, else kept there and named in the error; each adoption first moves back from those folders whatever `spec/` is missing, never overwriting, and removes them, a symbolic link among them removed unread), copies `spec.md` into `seeds/` as coach-me does, writes ITERATION `NNN WIP` and a fresh PROGRESS.yaml with carry-over. Lesson 0 writes only PROGRESS.yaml. **Does not commit**: the coach commits, following coach-me | Summary, and the `git show --stat` hint |
-  | `tutor_complete_iteration` | Writes ITERATION `NNN Done` and PROGRESS `summary`. Lesson 0 instead requires every Example to be passing or skipped | A `lesson-complete` card line |
+  | `tutor_adopt_iteration` | Only the caller's own lesson, and only the lesson after a Done one, or the first, or the current lesson when it is WIP with no progress recorded (set going by `fetch-iteration` outside BB). Does what `fetch.sh` does, from the local course. Every check runs first, so a refusal writes nothing: a factory that holds `.git` itself (an old-layout factory) is refused, as are a `spec/`, `stand-ins/`, `../seeds/` or seed that is a symbolic link and a `../seeds/` overlapping the course. Then it replaces only README.md, FACTORY.md and features/ in `spec/`, leaving its other files alone (staged in `spec/.tutor-adopting/` and swapped in only once all copied, the old ones moved aside into `spec/.tutor-previous/` meanwhile, so a lesson missing README.md or its features leaves the previous snapshot intact; the old files are deleted only once the swap finished or all are back, else kept there and named in the error; each adoption first moves back from those folders whatever is missing, never overwriting, and removes them, a symbolic link among them removed unread); copies `spec.md` to `../seeds/<codebase>.md` (`tetris/seeds/tetris.md`) only if that file is absent; refreshes `stand-ins/` wholesale from the course's `stand-ins/` the same staged way (its working folders inside `stand-ins/`, links copied as links; a course without one leaves it alone); then writes ITERATION `NNN WIP` and a fresh PROGRESS.yaml with carry-over. Lesson 0 writes only PROGRESS.yaml. **Does not commit**: the coach commits `spec/`, `../seeds/` and `ITERATION` as "Adopt spec for iteration NNN", as `fetch-iteration` does | Summary, the commit to make, and the `git show --stat` hint |
+  | `tutor_complete_iteration` | Writes ITERATION `NNN Done` and PROGRESS `summary`. Lesson 0 instead requires every Example to be passing or skipped | A `lesson-complete` card line, and the commit to make: the implementation, `ITERATION` and `spec/PROGRESS.yaml` as "Implement homework NNN" |
   | `tutor_side_chat` | Forks a side chat of the coach thread, with the question as its seed, and adds its tab (see above) | The new side chat's id, and where the student finds it |
 
 - **Dispatch guard:** an `experimental_hooks` `message.dispatch` handler queues, with a reason, the
@@ -283,8 +296,11 @@ the real tutorial repo behind `TUTOR_TEST_COURSE=/path/to/tutorial`, and skip it
 - **The skill** (`skills/tutor/SKILL.md`) explains the BB-specific behaviour: the tools, the
   evidence rules, the lesson card and Rule cards, when to emit `::tutor-progress` and
   `::term{id=…}` (lexicon ids only), side chats, and that only the coach thread moves the focus.
-  It tells the coach to follow the course's `coach` file as its coaching method, and that "jfdi"
-  remains a phrase the student types.
+  It tells the coach to follow the course's `coach` file, or else the starter's `coach-me` skill,
+  as its coaching method, and that "jfdi" remains a phrase the student types. It maps the
+  starter's `fetch-iteration` / `fetch.sh` to `tutor_adopt_iteration`, and it and the coach
+  instructions forbid running them or editing `ITERATION` or `spec/PROGRESS.yaml` by hand: the
+  `tutor_*` tools own them.
 
 ### RPC (BACKEND serves `server/rpc/`, FRONTEND calls)
 
@@ -354,7 +370,10 @@ not data.
   never used in tests.
 - The feature's scenarios live in `test/tutor/` and follow the `test/bb/` conventions. The
   codespace entry point is `.devcontainer/tutor/devcontainer.json`: `bb`, the `claude-code`,
-  `codex` and `pi` agent CLIs, and `tutor`, cloning the public tutorial repo at start-up.
+  `codex` and `pi` agent CLIs, and `tutor`, cloning the public tutorial repo and the upstream
+  `capstone-project-starter` (the `starter` / `starterRepo` options) at start-up, with `factory`
+  set to the starter's `tetris/.factory`. The start-up hook registers a dot-folder factory as the
+  BB project `<parent>/<name>` ("tetris/.factory").
   `sync-features.sh` copies every `./features/<id>` it names from `src/<id>`.
 
 ## Stubs to replace

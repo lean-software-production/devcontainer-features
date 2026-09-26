@@ -4,6 +4,71 @@ This log covers the MVP build, made while the owner was away. It records every p
 build diverges from [`DESIGN.md`](DESIGN.md) as reviewed in PR #4, and why. Entries are
 newest-first.
 
+## Starter layout (2026-09-26)
+
+Upstream moved the student's side of the course into `lean-software-production/capstone-project-starter`
+(2026-09-25). The student forks the starter; its `tetris/` folder is the codebase, `tetris/.factory`
+is the factory and the coding agent's working folder, and the fork is the Git repo. The starter's
+`fetch-iteration` skill (`fetch.sh`) adopts a homework and its `coach-me` skill coaches it. The
+tutorial deleted `.agents/coach-me.md` (fa5e3d1), so Tutor had been coaching with no coach file.
+Tutor now follows the starter. Every place this diverges from DESIGN.md:
+
+- **Decision 1 now wraps the starter, not the course's `coach-me.md`.** The conventions Tutor keeps
+  are the starter's: `ITERATION` at the factory root, the three lesson files in `spec/`, the seed in
+  `../seeds/` and `stand-ins/`. A student can still leave BB and carry on with the starter's skills.
+- **`ITERATION` sits at the factory root**, not in `spec/ITERATION`. Tutor reads the root file first
+  and falls back to an older factory's `spec/ITERATION`. It always writes the root file, then
+  removes `spec/ITERATION`, but only when `spec/` is a real folder, never through a symbolic link.
+  Problems name the file they came from. `spec/PROGRESS.yaml` stays where it was.
+- **`tutor_adopt_iteration` gives exactly what `fetch.sh` gives, from the local course checkout.**
+  It replaces only `spec/README.md`, `spec/FACTORY.md` and `spec/features/`, leaving anything else
+  in `spec/` alone (it used to replace the whole folder but `PROGRESS.yaml` and `ITERATION`). A
+  lesson without FACTORY.md removes the old one. The staged, symlink-safe swap is kept. Checked
+  against `fetch.sh` from the same course: the two trees were byte-identical, modes and links
+  included, after adopting 001 and again after 002.
+- **The seed goes to `../seeds/tetris.md`**, named after the codebase folder, and only when that
+  file is absent (written with `wx`). This supersedes "Seeds are named `seeds/<slug of the seed's
+  first heading>.md`" below. `../seeds/` must be a real folder that doesn't overlap the course, and
+  the seed path must not be a symbolic link. `../seeds/` is created only when there is a seed.
+- **`stand-ins/` is refreshed wholesale** at the factory root from the course's root `stand-ins/`,
+  by the same staged swap, with its working folders inside `stand-ins/` (the folder is gitignored),
+  links copied as links. A course without `stand-ins/` leaves the factory's alone. Every check for
+  `spec/`, the seed and `stand-ins/` runs before anything is written, and ITERATION is written last.
+- **An old-layout factory keeps its progress but can't adopt.** A factory folder that holds `.git`
+  itself (such as `/workspaces/my-factory`) would put `../seeds/` outside the student's repo, so
+  adoption is refused with a plain message before anything is touched. Reading progress still works.
+- **The commits are the starter's.** Tutor still doesn't commit. The coach is told to commit
+  `spec/`, `../seeds/` and `ITERATION` as "Adopt spec for iteration NNN", and on completion the
+  implementation, `ITERATION` and `spec/PROGRESS.yaml` as "Implement homework NNN".
+- **The coaching method falls back to the starter's skill.** The lookup is course.yaml's `coach`,
+  then the course's `.agents/coach-me.md`, then `<realpath(factory)>/../.agents/skills/coach-me/SKILL.md`.
+  The status text and the coach's prompts name whichever was found.
+- **Tutor and the starter's skills coexist.** The coach instructions and the `tutor` skill forbid
+  running `fetch-iteration` or `fetch.sh` and editing `ITERATION` or `spec/PROGRESS.yaml` by hand;
+  the skill maps "fetch-iteration / fetch.sh" to `tutor_adopt_iteration`. A lesson set to WIP
+  outside Tutor, with no progress recorded, can be adopted again by its own coach; before, that
+  deadlocked, since the lesson demanded adoption and none was offered.
+- **First run finds starter factories.** A folder qualifies with a root `ITERATION`, an older
+  `spec/ITERATION`, or an AGENTS.md naming the coach, compared without the file's extension, so the
+  starter's AGENTS.md naming **coach-me** qualifies. The detail reads "ITERATION · NNN status" or
+  "no ITERATION". Decision 8's reasoning changes: the factory is now the student's fork of the
+  starter, not a repo coach-me creates, and the welcome page says to fork the starter and add its
+  `tetris/.factory` folder as a BB project.
+- **The feature clones the starter** (feature 0.4.0). The new options `starter` and `starterRepo`
+  mirror `course` and `courseRepo` and default to empty. The start-up hook clones `starterRepo`
+  into `starter` when that folder is missing; a failed clone, of either repo, never fails the hook
+  or stops the other. `starter` must be a safe absolute path different from `course`, and
+  `starterRepo` needs a `starter` and must be https. `factory` stays explicit. A dot-folder factory
+  is registered as the BB project `<parent>/<name>`, so the starter's is "tetris/.factory".
+- **The codespace entry point uses the starter.** `.devcontainer/tutor/devcontainer.json` sets
+  `starter` to `/workspaces/capstone-project-starter`, `starterRepo` to the upstream starter and
+  `factory` to `/workspaces/capstone-project-starter/tetris/.factory`, where the design had
+  `/workspaces/my-factory`.
+
+Not done here: fast-forwarding the local course to GitHub's, shipping Tutor inside the starter's
+own devcontainer (a PR to that repo), and cloning the student's fork rather than the upstream
+starter in the codespace.
+
 ## The tutorial dropped Set after (2026-09-25)
 
 The tutorial's lesson table lost its `Set after` column ("Drop days from the iterations"), and
@@ -35,7 +100,8 @@ a regression test that failed before it and passes after.
   was left with the old features and no README. The lesson is now copied into a staging folder
   inside `spec/` first (README.md required, FACTORY.md optional) and swapped in only when all of it
   copied; the old files move aside during the swap and come back if it fails. The symbolic-link
-  refusals for `spec/`, `seeds/` and the seed are unchanged.
+  refusals for `spec/`, `seeds/` and the seed are unchanged. (Since the starter layout the seed
+  goes to `../seeds/`, and the swap replaces only the lesson's three names in `spec/`.)
 - **T4: the jump to a Rule waits for a slow page.** The search gave up after three loads in a row
   left the timeline's height unchanged, under 3 s in, although BB can show its loading row for
   longer before an older page arrives, so an early Rule was reported "Couldn't find" well within
@@ -237,7 +303,8 @@ issues. Four of the partial fixes and four of the new issues were closed in roun
 Behaviour-visible changes:
 
 - **Symbolic links never lead outside their folder.** Tutor refuses to adopt, seed or write
-  progress through a symlinked `spec/`, `seeds/` or seed file (a dangling seed link included). It
+  progress through a symlinked `spec/`, `seeds/` (now `../seeds/`, see Starter layout) or seed file
+  (a dangling seed link included), or, since the starter layout, a symlinked `stand-ins/`. It
   refuses a course whose `course.yaml`, ledger, root `README.md`, homework folders, coach or
   lexicon are symlinks leading outside the course.
 - **The course checkout can't be chosen as the factory.** Neither can a folder inside it or one
@@ -290,7 +357,8 @@ contracts. Smaller implementation choices are in `IMPLEMENTATION.md`.
 - **`tutor_complete_iteration` doesn't require every Example to pass** for a real homework, because
   coach-me decides when it's done; it notes how many are open. Homework 0 does require them.
 - **Seeds are named `seeds/<slug of the seed's first heading>.md`.** coach-me hard-codes
-  `seeds/tetris.md`; the generic rule gives the same name for this course.
+  `seeds/tetris.md`; the generic rule gives the same name for this course. Superseded by the
+  starter layout: the seed is `../seeds/<codebase folder>.md`, `tetris/seeds/tetris.md`.
 - **File I/O uses `node:fs` on the BB server's machine**, not `bb.sdk.files`, because a course
   codespace is a single machine.
 - **Opening a done homework with no coach thread spawns a "revisit" coach** that is told not to

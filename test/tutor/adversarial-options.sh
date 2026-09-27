@@ -35,6 +35,12 @@ expect_reject 'relative starter' 'starter must be' STARTER=capstone-project-star
 # shellcheck disable=SC2016 # the literal text is the attack
 expect_reject 'command substitution in starter' 'starter must be' STARTER='/tmp/$(id)'
 expect_reject 'starter equals course' 'starter and course must be different' COURSE=/workspaces/x STARTER=/workspaces/x/
+# A ${...} the tool building the container left unsubstituted (Codespaces and
+# the devcontainer CLI substitute ${containerWorkspaceFolder} in Feature options).
+# shellcheck disable=SC2016 # the literal text is the point
+expect_reject 'unsubstituted workspace variable as starter' 'unsubstituted ${...} variable' STARTER='${containerWorkspaceFolder}'
+# shellcheck disable=SC2016 # the literal text is the point
+expect_reject 'unsubstituted variable inside an absolute starter' 'unsubstituted ${...} variable' STARTER='/workspaces/${localWorkspaceFolderBasename}'
 expect_reject 'starterRepo without starter' 'starterRepo needs a starter' STARTERREPO=https://github.com/lean-software-production/capstone-project-starter.git
 expect_reject 'plain http starterRepo' 'starterRepo must be' STARTER=/workspaces/s STARTERREPO=http://github.com/lean-software-production/capstone-project-starter.git
 expect_reject 'option injection in starterRepo' 'starterRepo must be' STARTER=/workspaces/s STARTERREPO='--upload-pack=touch pwned'
@@ -86,6 +92,8 @@ expect_reject 'explicit options without the bb Feature' 'the bb Feature must be 
 expect_reject 'the starter layout without the bb Feature' 'the bb Feature must be installed first' \
     STARTER=/workspaces/capstone-project-starter/ STARTERREPO=https://github.com/lean-software-production/capstone-project-starter.git \
     FACTORY=/workspaces/capstone-project-starter/tetris/.factory
+expect_reject 'the starter as the project, with no factory, without the bb Feature' 'the bb Feature must be installed first' \
+    STARTER=/workspaces/capstone-project-starter STARTERREPO= FACTORY=
 expect_reject 'plugin list and theme without the bb Feature' 'the bb Feature must be installed first' \
     DISABLEPLUGINS=automations,tutor,provider-codex THEME=nord
 expect_reject 'another plugin release without the bb Feature' 'the bb Feature must be installed first' \

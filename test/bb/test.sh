@@ -3,7 +3,7 @@ set -e
 source dev-container-features-test-lib
 
 check "Feature-owned bb-app launcher is installed" bash -c "test -x /usr/local/share/bb/npm/bin/bb-app"
-check "bb-app version is pinned by default" bash -c "node -e \"process.exit(require('/usr/local/share/bb/npm/lib/node_modules/bb-app/package.json').version === '0.43.3' ? 0 : 1)\""
+check "bb-app version is pinned by default" bash -c "node -e \"process.exit(require('/usr/local/share/bb/npm/lib/node_modules/bb-app/package.json').version === '0.43.4' ? 0 : 1)\""
 check "reviewed native addons are usable" bash -c "node -e \"require('/usr/local/share/bb/npm/lib/node_modules/bb-app/node_modules/node-pty'); require('/usr/local/share/bb/npm/lib/node_modules/bb-app/node_modules/@parcel/watcher')\""
 check "upstream BB notice is retained" bash -c "grep -q 'MIT License' /usr/local/share/bb/NOTICE"
 check "public lifecycle helpers are installed" bash -c "command -v bb-feature-bootstrap && command -v bb-feature-autostart && command -v bb-feature-status"

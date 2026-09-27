@@ -1,0 +1,21 @@
+{
+  "id": "pi",
+  "version": "1.0.0",
+  "name": "Pi Coding Agent",
+  "description": "Installs the Pi terminal coding agent. Requires Node.js 22.19.0 or newer and npm from the consuming image or Feature.",
+  "documentationURL": "https://github.com/lean-software-production/devcontainer-features/tree/main/src/pi",
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/node"
+  ],
+  "options": {
+    "version": {
+      "type": "string",
+      "proposals": [
+        "latest",
+        "0.86.0"
+      ],
+      "default": "latest",
+      "description": "Pi package version to install. 'latest' is the rolling default; use an exact version such as '0.86.0' for reproducible containers."
+    }
+  }
+}

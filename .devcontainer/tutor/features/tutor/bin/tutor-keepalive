@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
+# Keeps a GitHub Codespace awake while the student is using BB in the browser.
+#
+# GitHub stops an idle Codespace after its idle timeout. Keyboard, mouse and
+# terminal input or output reset that timer; browser traffic through a
+# forwarded port does not. So while BB's page is in use, the Tutor plugin
+# stamps <dataDir>/.tutor-feature/activity with the time, and this loop, run in
+# a terminal by the Codespace's postAttachCommand, prints one short line every
+# 30 s while that stamp is under two minutes old. It prints nothing while the
+# student is away, so the idle timeout still stops an unused Codespace.
+#
+#   tutor-keepalive           run the loop (in a Codespace terminal only)
+#   tutor-keepalive --once    check once, print a line if BB is in use, exit
+#
+# Best effort: whether GitHub counts this terminal's output must be confirmed
+# in a real Codespace. The reliable fix is a longer idle timeout (see NOTES.md).
+set -euo pipefail
+# shellcheck source=tutor-feature-common.sh
+. /usr/local/share/tutor/bin/tutor-feature-common.sh
+
+say() { printf 'tutor: %s\n' "$*"; }
+
+once=false
+case "${1:-}" in
+    "") ;;
+    --once) once=true ;;
+    -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "usage: tutor-keepalive [--once]" >&2; exit 2 ;;
+esac
+interval="${TUTOR_KEEPALIVE_INTERVAL:-30}"
+[[ "$interval" =~ ^[1-9][0-9]*$ ]] || { echo "tutor: TUTOR_KEEPALIVE_INTERVAL must be a positive whole number" >&2; exit 2; }
+
+# The loop never outlives a local attach: the devcontainer CLI runs
+# postAttachCommand too and waits for it, and only Codespaces has an idle
+# timeout. Output that is not a terminal is not terminal activity either.
+# TUTOR_KEEPALIVE_FORCE=1 skips both checks (tests, manual runs).
+if ! $once && [ "${TUTOR_KEEPALIVE_FORCE:-}" != 1 ]; then
+    if [ "${CODESPACES:-}" != true ]; then
+        say "keep-alive only runs in a GitHub Codespace; nothing to do here"
+        exit 0
+    fi
+    if [ ! -t 1 ]; then
+        say "keep-alive output is not a terminal, so GitHub would not count it; not starting"
+        exit 0
+    fi
+fi
+
+bb_feature_validate_options
+if [ "$BB_FEATURE_MODE" != standalone ]; then
+    say "the bb Feature is in cli mode, so there is no BB page to watch"
+    exit 0
+fi
+bb_feature_prepare_data_dir
+tutor_prepare_runtime_dir
+activity="$TUTOR_FEATURE_RUNTIME_DIR/$TUTOR_ACTIVITY_FILE"
+
+activity_is_fresh() {
+    local line="" stamp age
+    [ -f "$activity" ] && [ ! -L "$activity" ] || return 1
+    IFS= read -r line < "$activity" || [ -n "$line" ] || return 1
+    [[ "$line" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,9})?Z$ ]] || return 1
+    stamp="$(date -u -d "$line" +%s 2>/dev/null)" || return 1
+    age=$(( $(date -u +%s) - stamp ))
+    # A few seconds of clock skew between the plugin and this loop are fine.
+    [ "$age" -ge -5 ] && [ "$age" -le "$TUTOR_ACTIVITY_WINDOW_SECONDS" ]
+}
+
+# Returns non-zero only when the line cannot be written (the terminal is gone).
+check() {
+    if activity_is_fresh; then
+        say "you're active in BB — keeping this Codespace awake ($(date +%H:%M))"
+    fi
+}
+
+if $once; then
+    check
+    exit 0
+fi
+
+# One loop per BB state directory, however many clients attach. The lock is
+# released when this process exits, including when its terminal is closed.
+lock="$TUTOR_FEATURE_RUNTIME_DIR/keepalive.lock"
+[ ! -L "$lock" ] || { tutor_fail "$lock is a symlink"; exit 1; }
+umask 077
+exec 9>>"$lock"
+if ! flock -n 9; then
+    say "keep-alive is already running in another terminal"
+    exit 0
+fi
+printf '%s\n' "$$" > "$lock"
+log="$TUTOR_FEATURE_RUNTIME_DIR/keepalive.log"
+# Where the output goes, so a real Codespace can be checked afterwards.
+printf '%s started pid %s, output %s\n' "$(date -u +%FT%TZ)" "$$" "$(readlink "/proc/$$/fd/1" || echo unknown)" >> "$log"
+trap 'exit 0' HUP INT TERM
+say "keep-alive is on: while you use BB this terminal prints a line every ${interval} s so the Codespace stays awake"
+while check; do
+    # Close the lock in the sleeper so the lock goes when this loop does.
+    sleep "$interval" 9>&- &
+    wait "$!"
+done
+printf '%s stopped pid %s: the terminal went away\n' "$(date -u +%FT%TZ)" "$$" >> "$log" 2>/dev/null || true

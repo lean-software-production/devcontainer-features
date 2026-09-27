@@ -1,0 +1,46 @@
+{
+  "standalone": {
+    "image": "mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie",
+    "remoteUser": "node",
+    "features": {
+      "bb": {
+        "version": "0.43.4",
+        "mode": "standalone",
+        "autoStart": true,
+        "serverPort": "48886",
+        "hostDaemonPort": "48887",
+        "dataDir": "/tmp/tutor bb state"
+      },
+      "tutor": {
+        "course": "/home/node/course",
+        "courseRepo": "https://github.com/lean-software-production/tutorial.git",
+        "factory": "/home/node/my-factory",
+        "selectOutline": true
+      }
+    },
+    "overrideFeatureInstallOrder": ["./bb", "./tutor"]
+  },
+  "no_clone_no_outline": {
+    "image": "mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie",
+    "remoteUser": "node",
+    "features": {
+      "bb": {
+        "version": "0.43.4",
+        "mode": "standalone",
+        "autoStart": true,
+        "serverPort": "48986",
+        "hostDaemonPort": "48987"
+      },
+      "tutor": {
+        "course": "/home/node/absent-course",
+        "courseRepo": "",
+        "starter": "/home/node/absent-starter",
+        "starterRepo": "",
+        "selectOutline": false,
+        "disablePlugins": "",
+        "theme": ""
+      }
+    },
+    "overrideFeatureInstallOrder": ["./bb", "./tutor"]
+  }
+}

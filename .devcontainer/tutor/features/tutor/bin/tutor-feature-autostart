@@ -1,0 +1,243 @@
+#!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
+# postStartCommand, as the remote user, after bb-feature-autostart: wait for the
+# local BB, path-install the prebuilt plugin once, switch off the plugins a
+# student does not need, select the course outline and the Tutor theme, and
+# register the course and factory as projects. Every step is idempotent, and
+# every choice a student can undo is made at most once per BB state directory,
+# so the hook is safe on every container start.
+set -euo pipefail
+# shellcheck source=tutor-feature-common.sh
+. /usr/local/share/tutor/bin/tutor-feature-common.sh
+
+bb_feature_validate_options
+if [ "$BB_FEATURE_MODE" != standalone ]; then
+    tutor_log "the bb Feature is in cli mode; nothing to start"
+    exit 0
+fi
+tutor_validate_options
+bb_feature_prepare_data_dir
+tutor_prepare_runtime_dir
+TUTOR_FEATURE_LOG="$TUTOR_FEATURE_RUNTIME_DIR/autostart.log"
+
+lock_file="$TUTOR_FEATURE_RUNTIME_DIR/autostart.lock"
+[ ! -L "$lock_file" ] || { tutor_fail "autostart lock is a symlink"; exit 1; }
+umask 077
+exec 9>"$lock_file"
+flock -w 300 9 || { tutor_fail "another tutor autostart is still running"; exit 1; }
+
+# bb-feature-autostart normally returns once BB is ready, but hooks can race a
+# slow start, so poll the plugin API itself. Without autoStart nobody else will
+# start BB, so probe once and explain.
+wait_seconds="${TUTOR_FEATURE_WAIT_SECONDS:-120}"
+[[ "$wait_seconds" =~ ^[0-9]+$ ]] || { tutor_fail "TUTOR_FEATURE_WAIT_SECONDS must be a whole number"; exit 1; }
+[ "$BB_FEATURE_AUTOSTART" = true ] || wait_seconds=0
+deadline=$((SECONDS + wait_seconds))
+until plugins_json="$(tutor_bb plugin list --json 2>/dev/null)" && [ -n "$plugins_json" ]; do
+    if [ "$SECONDS" -ge "$deadline" ]; then
+        if [ "$BB_FEATURE_AUTOSTART" = true ]; then
+            tutor_fail "BB's plugin API did not answer within ${wait_seconds}s; see $BB_FEATURE_DATA_DIR/.bb-feature/launcher.log"
+            exit 1
+        fi
+        tutor_log "BB is not running (bb autoStart is off); start it, then run tutor-feature-autostart"
+        exit 0
+    fi
+    sleep 1
+done
+
+# A path install builds the frontend bundle with bb's plugin toolchain, which
+# bb would otherwise download into <dataDir>/plugins. Seed the copy that was
+# fetched at image build; bb validates it by its pins file before use.
+seed_toolchain() {
+    local source name target staging
+    [ -d "$BB_FEATURE_DATA_DIR/plugins" ] || mkdir -m 0700 -- "$BB_FEATURE_DATA_DIR/plugins"
+    for source in "$TUTOR_FEATURE_TOOLCHAIN_DIR"/toolchain-*; do
+        [ -d "$source" ] || continue
+        name="$(basename -- "$source")"
+        target="$BB_FEATURE_DATA_DIR/plugins/$name"
+        if [ -e "$target" ] || [ -L "$target" ]; then continue; fi
+        staging="$(mktemp -d "$BB_FEATURE_DATA_DIR/plugins/.$name.tutor-XXXXXX")"
+        cp -R -- "$source/." "$staging/"
+        mv -T -- "$staging" "$target" 2>/dev/null || rm -rf -- "$staging"
+        tutor_log "seeded bb's plugin build toolchain $name"
+    done
+}
+
+# A path install writes dist/ into the plugin directory, so BB gets a
+# user-owned copy per plugin build: the small source tree is copied and the
+# root-owned node_modules is linked. The digest-named directory makes "already
+# installed from this path" mean "already installed from this build".
+stage_plugin() {
+    local digest staging
+    digest="$(cat -- "$TUTOR_FEATURE_PLUGIN_DIGEST")"
+    [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || { tutor_fail "the plugin digest is missing or malformed"; return 1; }
+    TUTOR_PLUGIN_INSTALL_DIR="$TUTOR_FEATURE_RUNTIME_DIR/plugin-${digest:0:16}"
+    [ ! -L "$TUTOR_PLUGIN_INSTALL_DIR" ] || { tutor_fail "$TUTOR_PLUGIN_INSTALL_DIR is a symlink"; return 1; }
+    [ -f "$TUTOR_PLUGIN_INSTALL_DIR/package.json" ] && return 0
+    rm -rf -- "$TUTOR_PLUGIN_INSTALL_DIR"
+    staging="$(mktemp -d "$TUTOR_FEATURE_RUNTIME_DIR/.plugin-XXXXXX")"
+    tar -C "$TUTOR_FEATURE_PLUGIN_DIR" --exclude=./node_modules -cf - . | tar -C "$staging" --no-same-owner -xf -
+    ln -s -- "$TUTOR_FEATURE_PLUGIN_DIR/node_modules" "$staging/node_modules"
+    mv -T -- "$staging" "$TUTOR_PLUGIN_INSTALL_DIR"
+}
+
+remove_stale_plugin_copies() {
+    local copy
+    for copy in "$TUTOR_FEATURE_RUNTIME_DIR"/plugin-* "$TUTOR_FEATURE_RUNTIME_DIR"/.plugin-*; do
+        [ -d "$copy" ] && [ "$copy" != "$TUTOR_PLUGIN_INSTALL_DIR" ] || continue
+        rm -rf -- "$copy"
+    done
+}
+
+install_plugin() {
+    local record root status output
+    stage_plugin || return 1
+    record="$(printf '%s' "$plugins_json" | tutor_json plugin "$TUTOR_PLUGIN_ID")"
+    root="${record%%$'\t'*}"
+    if [ "$root" = "$TUTOR_PLUGIN_INSTALL_DIR" ]; then
+        status="${record#*$'\t'}"
+        case "$status" in
+            running|degraded) TUTOR_PLUGIN_STATUS="$status"; tutor_log "plugin already installed from $root (status $status)"; return 0 ;;
+            # The student switched it off; that is theirs to undo.
+            disabled) TUTOR_PLUGIN_STATUS="$status"; tutor_log "plugin is installed from $root but disabled; leaving it off"; return 0 ;;
+        esac
+        tutor_log "plugin is installed from $root but its status is '${status:-unknown}'; reloading it"
+        tutor_bb plugin reload "$TUTOR_PLUGIN_ID" >/dev/null 2>&1 || true
+        record="$(tutor_bb plugin list --json | tutor_json plugin "$TUTOR_PLUGIN_ID")"
+        status="${record#*$'\t'}"
+        case "$status" in
+            running|degraded) TUTOR_PLUGIN_STATUS="$status"; tutor_log "plugin reloaded (status $status)"; return 0 ;;
+            *) tutor_fail "plugin is still '${status:-unknown}' after a reload; run: bb plugin logs $TUTOR_PLUGIN_ID"; return 1 ;;
+        esac
+    fi
+    [ -z "$root" ] || tutor_log "plugin is installed from $root; installing this image's build instead"
+    seed_toolchain
+    if ! output="$(tutor_bb plugin install "$TUTOR_PLUGIN_INSTALL_DIR" --yes 2>&1)"; then
+        tutor_fail "bb plugin install failed: $(printf '%s' "$output" | tail -n 5 | tr '\n' ' ')"
+        return 1
+    fi
+    remove_stale_plugin_copies
+    record="$(tutor_bb plugin list --json | tutor_json plugin "$TUTOR_PLUGIN_ID")"
+    status="${record#*$'\t'}"
+    case "$status" in
+        running|degraded) TUTOR_PLUGIN_STATUS="$status"; tutor_log "plugin installed from $TUTOR_PLUGIN_INSTALL_DIR (status $status)" ;;
+        *) tutor_fail "plugin installed but its status is '${status:-unknown}'; run: bb plugin logs $TUTOR_PLUGIN_ID"; return 1 ;;
+    esac
+}
+
+# A project is named after its folder, except that a dot-folder such as the
+# starter's tetris/.factory is named with its parent ("tetris/.factory"), so
+# the sidebar says whose factory it is.
+project_name() {
+    local name
+    name="$(basename -- "$1")"
+    [[ "$name" != .* ]] || name="$(basename -- "$(dirname -- "$1")")/$name"
+    printf '%s' "$name"
+}
+
+register_project() {
+    local label="$1" dir="$2" projects
+    [ -n "$dir" ] || return 0
+    if [ ! -d "$dir" ]; then
+        tutor_log "no $label at $dir yet; not registering it"
+        return 0
+    fi
+    projects="$(tutor_bb project list --json)" || { tutor_fail "cannot list BB projects"; return 1; }
+    if [ -n "$(printf '%s' "$projects" | tutor_json project "$dir")" ]; then
+        tutor_log "$label $dir is already a BB project"
+        return 0
+    fi
+    tutor_bb project create --name "$(project_name "$dir")" --root "$dir" >/dev/null || { tutor_fail "cannot register the $label $dir as a BB project"; return 1; }
+    tutor_log "registered the $label $dir as a BB project"
+}
+
+# Decide once per BB state directory, so a student who later switches back to
+# another thread list keeps that choice. Never replace a non-default choice.
+select_outline() {
+    local marker="$TUTOR_FEATURE_RUNTIME_DIR/outline-selected" current
+    [ "$TUTOR_SELECT_OUTLINE" = true ] || return 0
+    [ ! -e "$marker" ] || return 0
+    current="$(tutor_bb settings ui get sidebar.threadListProvider --json | tutor_json value)" \
+        || { tutor_fail "cannot read the sidebar thread list setting"; return 1; }
+    if [ "$current" = "$TUTOR_DEFAULT_THREAD_LIST" ]; then
+        tutor_bb settings ui set sidebar.threadListProvider "$TUTOR_OUTLINE_THREAD_LIST" >/dev/null \
+            || { tutor_fail "cannot select the course outline"; return 1; }
+        tutor_log "selected the course outline as the sidebar thread list"
+    else
+        tutor_log "sidebar thread list is already '$current'; leaving it"
+    fi
+    : > "$marker"
+}
+
+# Switch off each listed plugin once per BB state directory: an id is recorded
+# in the marker once it is disabled, found disabled or found missing, so a
+# student can turn any of them back on, and an id added to the option by a
+# later image is still switched off once. A failed disable is retried.
+disable_plugins() {
+    local marker="$TUTOR_FEATURE_RUNTIME_DIR/plugins-disabled" states id state rc=0
+    local -a ids
+    [ -n "$TUTOR_DISABLE_PLUGINS" ] || return 0
+    [ ! -L "$marker" ] || { tutor_fail "$marker is a symlink"; return 1; }
+    states="$(tutor_bb plugin list --json | tutor_json plugin-states)" || { tutor_fail "cannot list BB's plugins"; return 1; }
+    IFS=, read -r -a ids <<< "$TUTOR_DISABLE_PLUGINS"
+    for id in "${ids[@]}"; do
+        if tutor_protected_plugin "$id"; then
+            tutor_log "refusing to disable '$id': Tutor needs it"
+            continue
+        fi
+        if [ -f "$marker" ] && grep -qxF -- "$id" "$marker"; then continue; fi
+        state="$(printf '%s' "$states" | awk -F '\t' -v id="$id" '$1 == id { print $2; exit }')"
+        case "$state" in
+            "") tutor_log "plugin '$id' is not installed; nothing to disable" ;;
+            disabled) tutor_log "plugin '$id' is already disabled" ;;
+            *)
+                if ! tutor_bb plugin disable "$id" >/dev/null 2>&1; then
+                    tutor_fail "cannot disable the plugin '$id'; it is retried on the next start"
+                    rc=1
+                    continue
+                fi
+                tutor_log "disabled the plugin '$id' (turn it back on under Settings → Plugins)" ;;
+        esac
+        printf '%s\n' "$id" >> "$marker"
+    done
+    return "$rc"
+}
+
+# Decide once per BB state directory, like the outline: only while BB's default
+# theme is active, and only once the Tutor plugin runs, because it contributes
+# the theme. A theme BB does not offer yet is left for a later start.
+select_theme() {
+    local marker="$TUTOR_FEATURE_RUNTIME_DIR/theme-selected" current
+    [ -n "$TUTOR_THEME" ] || return 0
+    [ ! -e "$marker" ] || return 0
+    case "${TUTOR_PLUGIN_STATUS:-}" in
+        running|degraded) ;;
+        *) tutor_log "the Tutor plugin is not running; not choosing the theme"; return 0 ;;
+    esac
+    current="$(tutor_bb theme show --json | tutor_json theme)" || { tutor_fail "cannot read BB's theme"; return 1; }
+    if [ "$current" != "$TUTOR_DEFAULT_THEME" ]; then
+        tutor_log "theme is already '$current'; leaving it"
+        : > "$marker"
+        return 0
+    fi
+    if ! tutor_bb theme show "$TUTOR_THEME" --json >/dev/null 2>&1; then
+        tutor_log "theme '$TUTOR_THEME' is not available in BB; leaving BB's theme for now"
+        return 0
+    fi
+    tutor_bb theme set "$TUTOR_THEME" --json >/dev/null || { tutor_fail "cannot select the theme '$TUTOR_THEME'"; return 1; }
+    tutor_log "selected the theme '$TUTOR_THEME'"
+    : > "$marker"
+}
+
+status=0
+TUTOR_PLUGIN_STATUS=
+if install_plugin; then
+    select_outline || status=1
+else
+    status=1
+fi
+disable_plugins || status=1
+select_theme || status=1
+register_project course "$TUTOR_COURSE" || status=1
+register_project factory "$TUTOR_FACTORY" || status=1
+exit "$status"

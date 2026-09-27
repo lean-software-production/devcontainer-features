@@ -1,0 +1,21 @@
+{
+  "id": "codex",
+  "version": "1.0.0",
+  "name": "OpenAI Codex CLI",
+  "description": "Installs the OpenAI Codex coding-agent CLI. Add a Node.js Feature or use a Node.js base image; this Feature does not install Node.js.",
+  "documentationURL": "https://github.com/lean-software-production/devcontainer-features/tree/main/src/codex",
+  "installsAfter": [
+    "ghcr.io/devcontainers/features/node"
+  ],
+  "options": {
+    "version": {
+      "type": "string",
+      "proposals": [
+        "latest",
+        "0.155.1"
+      ],
+      "default": "latest",
+      "description": "Codex CLI version to install. 'latest' is the rolling default; use an exact version for reproducible containers."
+    }
+  }
+}

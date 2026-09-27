@@ -1,0 +1,69 @@
+{
+  "id": "tutor",
+  "version": "0.5.0",
+  "name": "Tutor coached course for BB",
+  "description": "Adds the Tutor BB plugin (a checksummed bb-plugin-tutor release: the pinned one by default, or the newest with pluginVersion 'latest') to the bb Feature's standalone server: a course outline in the sidebar and a coach thread per lesson that works one Gherkin Rule at a time. Requires the bb Feature in standalone mode.",
+  "documentationURL": "https://github.com/lean-software-production/devcontainer-features/tree/main/src/tutor",
+  "options": {
+    "course": {
+      "type": "string",
+      "default": "/workspaces/tutorial",
+      "description": "Absolute path of the course checkout the plugin reads."
+    },
+    "courseRepo": {
+      "type": "string",
+      "proposals": ["https://github.com/lean-software-production/tutorial.git", ""],
+      "default": "https://github.com/lean-software-production/tutorial.git",
+      "description": "HTTPS Git URL cloned into 'course' after the container is created, if 'course' does not exist yet. Empty never clones."
+    },
+    "starter": {
+      "type": "string",
+      "default": "",
+      "description": "Optional absolute path of the student's capstone-project-starter checkout, which holds the factory (for example /workspaces/capstone-project-starter). Must differ from 'course'. Empty means no starter."
+    },
+    "starterRepo": {
+      "type": "string",
+      "proposals": ["https://github.com/lean-software-production/capstone-project-starter.git", ""],
+      "default": "",
+      "description": "HTTPS Git URL cloned into 'starter' after the container is created, if 'starter' does not exist yet. Needs 'starter'. Empty never clones."
+    },
+    "factory": {
+      "type": "string",
+      "default": "",
+      "description": "Optional absolute path of the student's factory: the folder holding spec/ and ITERATION, such as <starter>/tetris/.factory. When it exists it is registered as a BB project, and the plugin pre-selects it."
+    },
+    "selectOutline": {
+      "type": "boolean",
+      "default": true,
+      "description": "Select the Tutor course outline as BB's sidebar thread list once, unless another thread list was chosen already."
+    },
+    "disablePlugins": {
+      "type": "string",
+      "proposals": [
+        "automations,workflows,tasks,scheduled-send,github,browser-automation,agent-annotations,connect,plugin-api-docs,plugin-api-tester,theme-preview,keep-awake,account-pool,environment-modal-sandbox",
+        ""
+      ],
+      "default": "automations,workflows,tasks,scheduled-send,github,browser-automation,agent-annotations,connect,plugin-api-docs,plugin-api-tester,theme-preview,keep-awake,account-pool,environment-modal-sandbox",
+      "description": "Comma-separated BB plugin ids to switch off once per BB state directory, so a student can turn any back on. Plugins that are not installed are skipped; tutor, thread-list, provider-* and the workspace environments are never switched off. Empty switches off nothing."
+    },
+    "theme": {
+      "type": "string",
+      "proposals": ["plugin:tutor:paper", ""],
+      "default": "plugin:tutor:paper",
+      "description": "BB theme id to select once per BB state directory, only while BB's default theme is active. Empty leaves BB's theme alone."
+    },
+    "pluginVersion": {
+      "type": "string",
+      "proposals": ["0.1.0", "latest"],
+      "default": "0.1.0",
+      "description": "bb-plugin-tutor release downloaded from GitHub at image build: a plain semantic version (no 'v' prefix or range), or 'latest'. The default is the release this Feature pins, verified against its pinned SHA-256; any other version needs pluginSha256. 'latest' resolves to the newest release when the image is built (a prebuilt image keeps it until rebuilt) and is checked only against that release's own .sha256, which catches corruption but not a compromised release."
+    },
+    "pluginSha256": {
+      "type": "string",
+      "default": "",
+      "description": "SHA-256 (64 lower-case hex digits) of bb-plugin-tutor-<pluginVersion>.tgz. Required when pluginVersion is an explicit version other than the pinned default; with the default it must be empty or equal the pin; with 'latest' it must be empty. For an explicit version the release's own .sha256 file is never trusted."
+    }
+  },
+  "postCreateCommand": "/usr/local/share/tutor/bin/tutor-feature-bootstrap",
+  "postStartCommand": "/usr/local/share/tutor/bin/tutor-feature-autostart"
+}

@@ -17,9 +17,9 @@ Adds the Tutor BB plugin (a checksummed bb-plugin-tutor release: the pinned one 
 |-----|-----|-----|-----|
 | course | Absolute path of the course checkout the plugin reads. | string | /workspaces/tutorial |
 | courseRepo | HTTPS Git URL cloned into 'course' after the container is created, if 'course' does not exist yet. Empty never clones. | string | https://github.com/lean-software-production/tutorial.git |
-| starter | Optional absolute path of the student's capstone-project-starter checkout, which holds the factory (for example /workspaces/capstone-project-starter). Must differ from 'course'. Empty means no starter. | string | - |
+| starter | Optional absolute path of the student's repo: a capstone-project-starter checkout or fork, such as /workspaces/capstone-project-starter, or ${containerWorkspaceFolder} when the starter is the workspace itself. When it exists it is registered as the BB project, named after its folder, and config.json names it as the plugin's repo. Must differ from 'course'. Empty means no starter. | string | - |
 | starterRepo | HTTPS Git URL cloned into 'starter' after the container is created, if 'starter' does not exist yet. Needs 'starter'. Empty never clones. | string | - |
-| factory | Optional absolute path of the student's factory: the folder holding spec/ and ITERATION, such as <starter>/tetris/.factory. When it exists it is registered as a BB project, and the plugin pre-selects it. | string | - |
+| factory | Legacy, optional: absolute path of the student's factory, the folder holding spec/ and ITERATION, such as <starter>/tetris/.factory. It is written to config.json as a hint for the plugin, and is registered as the BB project only when 'starter' is empty (the behaviour before 0.6.0). New configurations set 'starter' and leave this empty. | string | - |
 | selectOutline | Select the Tutor course outline as BB's sidebar thread list once, unless another thread list was chosen already. | boolean | true |
 | disablePlugins | Comma-separated BB plugin ids to switch off once per BB state directory, so a student can turn any back on. Plugins that are not installed are skipped; tutor, thread-list, provider-* and the workspace environments are never switched off. Empty switches off nothing. | string | automations,workflows,tasks,scheduled-send,github,browser-automation,agent-annotations,connect,plugin-api-docs,plugin-api-tester,theme-preview,keep-awake,account-pool,environment-modal-sandbox |
 | theme | BB theme id to select once per BB state directory, only while BB's default theme is active. Empty leaves BB's theme alone. | string | plugin:tutor:paper |
@@ -47,15 +47,14 @@ terminal.
 ## Install order
 
 The plugin is built with the bb Feature's packaged CLI, so bb must be
-installed first. This Feature deliberately has no `installsAfter` yet: the
-devcontainer CLI resolves every `installsAfter` reference, and the bb Feature
-is not published, so a reference to it fails every build. Each configuration
-therefore pins the order with `overrideFeatureInstallOrder` (bb, then tutor),
-and `install.sh` fails with that advice if bb is missing. Add
-`"installsAfter": ["ghcr.io/lean-software-production/devcontainer-features/bb"]`
-once bb is published. It will still not order a *local* bb, because
-`installsAfter` only matches Features of the same kind, so local
-compositions keep the override.
+installed first. Since 0.6.0 the Feature declares
+`"installsAfter": ["ghcr.io/lean-software-production/devcontainer-features/bb"]`,
+which orders the published bb before it. The devcontainer CLI resolves every
+`installsAfter` reference, so a build needs to reach `ghcr.io` for it even
+when bb is local. It does not order a *local* bb, because `installsAfter` only
+matches Features of the same kind, so local compositions (this repository's
+scenarios and Codespace entry point) keep `overrideFeatureInstallOrder` (bb,
+then tutor), and `install.sh` still fails with that advice if bb is missing.
 
 ## Where the plugin comes from
 
@@ -142,7 +141,9 @@ when the container starts, apart from the optional course and starter clones.
 
 1. Validates the options: absolute paths without dot segments, quotes, control
    characters or shell metacharacters; `factory` and `starter` each different
-   from `course`; `courseRepo` and `starterRepo` empty or an `https://` URL
+   from `course`; a `starter` still holding `${...}` (a variable such as
+   `${containerWorkspaceFolder}` that the tool building the image did not
+   substitute) fails with a message saying so; `courseRepo` and `starterRepo` empty or an `https://` URL
    without credentials, query or fragment; `starterRepo` only with a
    `starter`; `pluginVersion` `latest` or a plain semantic version
    (`MAJOR.MINOR.PATCH` with an optional pre-release; no `v` prefix, range or
@@ -172,11 +173,11 @@ when the container starts, apart from the optional course and starter clones.
    throwaway state directory and the toolchain is kept at
    `/usr/local/share/tutor/toolchain`, so no start-up needs the network.
 6. Writes `/usr/local/etc/tutor/config.json` (`{ "schemaVersion": 1,
-   "course", "factory", "dataDir" }`, the contract the plugin reads; the
-   plugin treats a missing `schemaVersion` as 1 and refuses any other;
-   `factory` is omitted when
-   empty, and `starter` is not part of it, because the plugin finds the
-   codebase from the factory) and `/usr/local/share/tutor/options.tsv` (for
+   "course", "repo", "factory", "dataDir" }`, the contract the plugin reads;
+   the plugin treats a missing `schemaVersion` as 1, refuses any other and
+   ignores keys it does not know, so 0.6.0's `repo` needed no new version.
+   `repo` is the `starter` option, the student's repo, and `factory` the
+   legacy `factory` option; each is omitted when empty) and `/usr/local/share/tutor/options.tsv` (for
    the hooks), both root-owned 0644, plus `plugin.sha256`, a digest of the
    staged plugin, including the built `dist/` but not `node_modules`. `dataDir` is the BB state
    directory the hooks use: the bb Feature's `dataDir`, or `<remote user's
@@ -220,12 +221,20 @@ order, so it follows `bb-feature-autostart`. It:
   deletes the old copy. Before installing, it seeds the kept toolchain into
   `<dataDir>/plugins/` if bb has none; bb verifies a toolchain's pins file
   before using it;
-- registers `course` and `factory` as BB projects when the directory exists
-  and no project has that local source path yet (the plugin itself never
-  creates projects). A project is named after its folder, except that a
-  dot-folder is named with its parent, so the starter's factory
+- registers `course` and the student's repo as BB projects when the
+  directory exists and no project has that local source path yet (the plugin
+  itself never creates projects). The student's repo is `starter` when it is
+  set: coach threads start there, so a folder that moves inside it (the
+  starter's factory moves from `tetris/.factory` to `factory/` at lesson 004)
+  never strands a thread. The starter is named by its basename, so a fork
+  cloned as `my-fork` is the project `my-fork`, and it is skipped when a
+  project's local source already is the starter or sits anywhere inside it,
+  such as the `tetris/.factory` a 0.5.0 Codespace registered, whose threads
+  live there. The `factory` option is registered instead only when `starter`
+  is empty, as before 0.6.0; there a project is named after its folder,
+  except that a dot-folder is named with its parent, so
   `<starter>/tetris/.factory` is the project `tetris/.factory` rather than
-  `.factory`. The starter itself is not registered;
+  `.factory`;
 - selects the course outline with
   `bb settings ui set sidebar.threadListProvider tutor/course-outline`, once per
   state directory, only when the plugin is installed, `selectOutline` is true,
@@ -312,7 +321,8 @@ CI runs:
     scenarios need that release published and its SHA-256 pinned), prebuilt,
     root-owned, with runtime dependencies only; `config.json`'s schema version;
     course cloned; plugin running from its digest copy; toolchain seeded, not
-    downloaded; projects and outline; idempotent restarts; the student's outline
+    downloaded; projects and outline, with a factory-only configuration
+    (no `starter`, so no `repo` in `config.json`); idempotent restarts; the student's outline
     choice kept; `config.json`'s `dataDir`; the unneeded plugins switched off
     once and a re-enabled one kept on; the Tutor theme selected once and a
     student's own theme kept; `tutor-keepalive` returning at once outside
@@ -322,6 +332,10 @@ CI runs:
   - `no_clone_no_outline`: an empty `courseRepo` and `starterRepo`,
     `selectOutline: false`, an empty `disablePlugins` and an empty `theme` in
     the default state directory;
+  - `starter_workspace`: `starter` is `${containerWorkspaceFolder}` with an
+    empty `starterRepo`, as in a starter's own Codespace: the variable is
+    substituted, `config.json` names the workspace as `repo`, nothing is
+    cloned, and the workspace is the BB project, named after its folder;
 - hermetic tests of the option validation and of every hook decision against
   a fake bb CLI, including the keep-alive's freshness window and single
   instance;
@@ -336,8 +350,8 @@ CI runs:
   each refused;
 - a bring-up of the Codespace entry point itself (`codespace-entry.sh`, on
   ports 48886/48887 and with `/workspaces` paths moved under the home
-  directory), including the starter clone and its factory registered as
-  `tetris/.factory`, the Claude Code, Codex and Pi CLIs on BB's `PATH` and
+  directory), including the starter clone registered as the BB project
+  `capstone-project-starter`, the Claude Code, Codex and Pi CLIs on BB's `PATH` and
   reported installed by `bb updates status`, the switched-off plugins and the
   theme;
 - the check that the entry point's Feature copies match `src/`.

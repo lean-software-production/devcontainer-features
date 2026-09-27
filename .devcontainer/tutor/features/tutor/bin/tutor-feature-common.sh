@@ -131,6 +131,18 @@ process.stdin.on("data", (d) => (input += d)).on("end", () => {
     // `bb project list --json`: "yes" when a local source has path <arg>.
     project: () =>
       data.some((p) => (p.sources || []).some((s) => s.type === "local_path" && s.path === arg)) ? "yes" : "",
+    // `bb project list --json`: "yes" when a local source is <arg> itself, or
+    // else the first local source path inside <arg>; paths are compared
+    // normalised, so a trailing slash does not matter.
+    "project-within": () => {
+      const path = require("path");
+      const dir = path.resolve(arg);
+      const paths = data.flatMap((p) => (p.sources || []).filter((s) => s.type === "local_path" && typeof s.path === "string"))
+        .map((s) => path.resolve(s.path));
+      if (paths.includes(dir)) return "yes";
+      const inside = paths.find((p) => { const rel = path.relative(dir, p); return rel && !rel.startsWith("..") && !path.isAbsolute(rel); });
+      return inside || "";
+    },
     // `bb settings ui get <key> --json`: the value.
     value: () => (typeof data.value === "string" ? data.value : JSON.stringify(data.value)),
   }[query];

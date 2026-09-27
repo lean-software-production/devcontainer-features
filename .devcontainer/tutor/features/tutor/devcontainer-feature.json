@@ -1,6 +1,6 @@
 {
   "id": "tutor",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "name": "Tutor coached course for BB",
   "description": "Adds the Tutor BB plugin (a checksummed bb-plugin-tutor release: the pinned one by default, or the newest with pluginVersion 'latest') to the bb Feature's standalone server: a course outline in the sidebar and a coach thread per lesson that works one Gherkin Rule at a time. Requires the bb Feature in standalone mode.",
   "documentationURL": "https://github.com/lean-software-production/devcontainer-features/tree/main/src/tutor",
@@ -19,7 +19,7 @@
     "starter": {
       "type": "string",
       "default": "",
-      "description": "Optional absolute path of the student's capstone-project-starter checkout, which holds the factory (for example /workspaces/capstone-project-starter). Must differ from 'course'. Empty means no starter."
+      "description": "Optional absolute path of the student's repo: a capstone-project-starter checkout or fork, such as /workspaces/capstone-project-starter, or ${containerWorkspaceFolder} when the starter is the workspace itself. When it exists it is registered as the BB project, named after its folder, and config.json names it as the plugin's repo. Must differ from 'course'. Empty means no starter."
     },
     "starterRepo": {
       "type": "string",
@@ -30,7 +30,7 @@
     "factory": {
       "type": "string",
       "default": "",
-      "description": "Optional absolute path of the student's factory: the folder holding spec/ and ITERATION, such as <starter>/tetris/.factory. When it exists it is registered as a BB project, and the plugin pre-selects it."
+      "description": "Legacy, optional: absolute path of the student's factory, the folder holding spec/ and ITERATION, such as <starter>/tetris/.factory. It is written to config.json as a hint for the plugin, and is registered as the BB project only when 'starter' is empty (the behaviour before 0.6.0). New configurations set 'starter' and leave this empty."
     },
     "selectOutline": {
       "type": "boolean",
@@ -64,6 +64,7 @@
       "description": "SHA-256 (64 lower-case hex digits) of bb-plugin-tutor-<pluginVersion>.tgz. Required when pluginVersion is an explicit version other than the pinned default; with the default it must be empty or equal the pin; with 'latest' it must be empty. For an explicit version the release's own .sha256 file is never trusted."
     }
   },
+  "installsAfter": ["ghcr.io/lean-software-production/devcontainer-features/bb"],
   "postCreateCommand": "/usr/local/share/tutor/bin/tutor-feature-bootstrap",
   "postStartCommand": "/usr/local/share/tutor/bin/tutor-feature-autostart"
 }

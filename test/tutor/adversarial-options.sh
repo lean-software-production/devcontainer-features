@@ -59,6 +59,10 @@ expect_reject 'space in disablePlugins' 'disablePlugins must be' DISABLEPLUGINS=
 expect_reject 'shell injection in theme' 'theme must be' THEME='plugin:tutor:paper;touch pwned'
 expect_reject 'space in theme' 'theme must be' THEME='my theme'
 sha="$(printf '%064d' 7)"
+# A release other than the one plugin-pin.sh pins, whatever that is.
+# shellcheck source=../../src/tutor/plugin-pin.sh
+. "$repo_root/src/tutor/plugin-pin.sh"
+other="$((${TUTOR_PLUGIN_PINNED_VERSION%%.*} + 1)).0.0"
 expect_reject "a 'v' prefix in pluginVersion" 'pluginVersion must be' PLUGINVERSION=v0.1.0 PLUGINSHA256="$sha"
 expect_reject 'a range in pluginVersion' 'pluginVersion must be' PLUGINVERSION='^0.1.0' PLUGINSHA256="$sha"
 expect_reject 'a partial pluginVersion' 'pluginVersion must be' PLUGINVERSION=0.1 PLUGINSHA256="$sha"
@@ -70,11 +74,11 @@ expect_reject 'shell injection in pluginVersion' 'pluginVersion must be' PLUGINV
 expect_reject 'command substitution in pluginVersion' 'pluginVersion must be' PLUGINVERSION='0.1.0-$(id)' PLUGINSHA256="$sha"
 expect_reject 'a path in pluginVersion' 'pluginVersion must be' PLUGINVERSION=../0.1.0 PLUGINSHA256="$sha"
 expect_reject 'a newline in pluginVersion' 'pluginVersion must be' PLUGINVERSION=$'0.1.0\n0.2.0' PLUGINSHA256="$sha"
-expect_reject 'an upper-case pluginSha256' 'pluginSha256 must be' PLUGINVERSION=0.2.0 PLUGINSHA256="$(printf 'A%063d' 0)"
-expect_reject 'a short pluginSha256' 'pluginSha256 must be' PLUGINVERSION=0.2.0 PLUGINSHA256="${sha:1}"
-expect_reject 'a non-hex pluginSha256' 'pluginSha256 must be' PLUGINVERSION=0.2.0 PLUGINSHA256="g${sha:1}"
-expect_reject 'shell injection in pluginSha256' 'pluginSha256 must be' PLUGINVERSION=0.2.0 PLUGINSHA256="${sha:10};touch pwned"
-expect_reject 'another pluginVersion without pluginSha256' 'pluginSha256 is required' PLUGINVERSION=0.2.0
+expect_reject 'an upper-case pluginSha256' 'pluginSha256 must be' PLUGINVERSION="$other" PLUGINSHA256="$(printf 'A%063d' 0)"
+expect_reject 'a short pluginSha256' 'pluginSha256 must be' PLUGINVERSION="$other" PLUGINSHA256="${sha:1}"
+expect_reject 'a non-hex pluginSha256' 'pluginSha256 must be' PLUGINVERSION="$other" PLUGINSHA256="g${sha:1}"
+expect_reject 'shell injection in pluginSha256' 'pluginSha256 must be' PLUGINVERSION="$other" PLUGINSHA256="${sha:10};touch pwned"
+expect_reject 'another pluginVersion without pluginSha256' 'pluginSha256 is required' PLUGINVERSION="$other"
 expect_reject 'a pluginSha256 that differs from the pin' "differs from this Feature's pinned SHA-256" PLUGINSHA256="$sha"
 expect_reject 'latest with a pluginSha256' "pluginSha256 must be empty when pluginVersion is 'latest'" PLUGINVERSION=latest PLUGINSHA256="$sha"
 expect_reject 'latest with a malformed pluginSha256' "pluginSha256 must be empty when pluginVersion is 'latest'" PLUGINVERSION=latest PLUGINSHA256=nope

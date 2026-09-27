@@ -14,21 +14,30 @@ trap 'rm -rf "$tmp"' EXIT
 serve="$tmp/serve"
 mkdir -p "$tmp/bin" "$serve"
 releases=https://github.com/lean-software-production/bb-plugin-tutor/releases/download
+latest=https://github.com/lean-software-production/bb-plugin-tutor/releases/latest
+tags=https://github.com/lean-software-production/bb-plugin-tutor/releases/tag
 
 # The fake curl records its arguments and serves $serve/<tag>/<file> for a
-# release URL; anything else, or a missing file, fails as curl -f does.
+# release URL; anything else, or a missing file, fails as curl -f does. For
+# releases/latest it prints, as -w '%{url_effective}' would, the URL that
+# GitHub's redirect lands on, read from $serve/latest (missing: curl fails).
 cat > "$tmp/bin/curl" <<EOF
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> "$tmp/curl.log"
-out= url=
+out= url= format=
 while [ "\$#" -gt 0 ]; do
     case "\$1" in
         -o) out="\$2"; shift 2 ;;
-        -*) case "\$1" in --proto|--proto-redir|--connect-timeout|--retry|--retry-delay) shift ;; esac; shift ;;
+        -w) format="\$2"; shift 2 ;;
+        -*) case "\$1" in --proto|--proto-redir|--connect-timeout|--retry|--retry-delay|--max-filesize) shift ;; esac; shift ;;
         *) url="\$1"; shift ;;
     esac
 done
 case "\$url" in
+    $latest)
+        [ "\$format" = '%{url_effective}' ] || { echo "fake curl: releases/latest without -w %{url_effective}" >&2; exit 1; }
+        [ -f "$serve/latest" ] || { echo "curl: (22) The requested URL returned error: 404" >&2; exit 22; }
+        printf '%s' "\$(cat "$serve/latest")"; exit 0 ;;
     $releases/*) file="$serve/\${url#"$releases/"}" ;;
     *) echo "fake curl: unexpected URL \$url" >&2; exit 1 ;;
 esac
@@ -95,6 +104,14 @@ fetch() {
     bash -c 'set -euo pipefail; . "$1"; tutor_plugin_fetch "$2" "$3" "$4/work" "$4/dest" || exit 1' \
         _ "$helper" "$1" "$2" "$case_dir" >"$case_dir/out" 2>&1
 }
+# fetch_latest: as fetch, but through tutor_plugin_fetch_latest, and prints the
+# version it reports afterwards on the last line of $case_dir/out.
+fetch_latest() {
+    case_dir="$(mktemp -d "$tmp/case.XXXXXX")"
+    mkdir "$case_dir/work" "$case_dir/dest"
+    bash -c 'set -euo pipefail; . "$1"; tutor_plugin_fetch_latest "$2/work" "$2/dest" || exit 1; echo "resolved=$TUTOR_PLUGIN_LATEST_VERSION sha=$TUTOR_PLUGIN_LATEST_SHA256"' \
+        _ "$helper" "$case_dir" >"$case_dir/out" 2>&1
+}
 pass() { echo "ok   $1"; }
 flunk() { echo "FAIL $1" >&2; sed 's/^/     | /' "$case_dir/out" >&2; failures=$((failures + 1)); }
 # expect_reject <label> <message> <version> <sha256>: fails with <message> and
@@ -106,8 +123,19 @@ expect_reject() {
     [ -z "$(ls -A "$case_dir/dest")" ] || { flunk "$label (left files in the destination)"; return; }
     pass "$label"
 }
-# nothing_extracted: the work directory holds at most the downloaded tarball.
-nothing_extracted() { [ -z "$(find "$case_dir/work" -mindepth 1 ! -name '*.tgz' -print -quit)" ]; }
+# expect_latest_reject <label> <message>: as expect_reject, for fetch_latest.
+expect_latest_reject() {
+    local label="$1" message="$2"
+    if fetch_latest; then flunk "$label (was accepted)"; return; fi
+    grep -qF -- "$message" "$case_dir/out" || { flunk "$label (rejected for the wrong reason)"; return; }
+    [ -z "$(ls -A "$case_dir/dest")" ] || { flunk "$label (left files in the destination)"; return; }
+    pass "$label"
+}
+# nothing_extracted: the work directory holds at most the downloaded tarball
+# and its .sha256 file.
+nothing_extracted() { [ -z "$(find "$case_dir/work" -mindepth 1 ! -name '*.tgz' ! -name '*.tgz.sha256' -print -quit)" ]; }
+# nothing_downloaded: the work directory holds no tarball and nothing extracted.
+nothing_downloaded() { [ -z "$(find "$case_dir/work" -mindepth 1 ! -name '*.tgz.sha256' -print -quit)" ]; }
 
 # The pin and devcontainer-feature.json's pluginVersion default agree.
 # shellcheck source=../../src/tutor/plugin-pin.sh
@@ -174,6 +202,70 @@ expect_reject "a download failure is reported" "could not download $releases/v0.
 if nothing_extracted; then pass "a download failure extracts nothing"; else flunk "a download failure extracts nothing"; fi
 expect_reject "a version with a 'v' prefix is refused" "is not a plain semantic version" v0.1.0 "$good_sha"
 expect_reject "an upper-case SHA-256 is refused" "64 lower-case hex digits" 0.1.0 "$(tr a-f A-F <<<"$good_sha")"
+
+# pluginVersion "latest": the version comes from where GitHub's releases/latest
+# redirect lands, and the SHA-256 from that release's own .sha256 file.
+# publish_sha256 <version> <content>: serves <content> as the release's .sha256.
+publish_sha256() { printf '%s' "$2" > "$serve/v$1/bb-plugin-tutor-$1.tgz.sha256"; }
+mapfile -t good < <(good_entries 1.2.3)
+latest_sha="$(publish 1.2.3 "${good[@]}")"
+publish_sha256 1.2.3 "$latest_sha  bb-plugin-tutor-1.2.3.tgz"$'\n'
+printf '%s' "$tags/v1.2.3" > "$serve/latest"
+if fetch_latest \
+    && grep -qxF "tutor plugin fetch: latest is 1.2.3" "$case_dir/out" \
+    && [ "$(tail -n1 "$case_dir/out")" = "resolved=1.2.3 sha=$latest_sha" ] \
+    && [ "$(cat "$case_dir/dest/server/coach.ts")" = "export {}" ] \
+    && grep -qxF -- "-fsSIL --proto =https --proto-redir =https --tlsv1.2 --connect-timeout 30 --retry 5 --retry-delay 2 -o /dev/null -w %{url_effective} $latest" "$tmp/curl.log" \
+    && grep -qF -- "--proto =https --proto-redir =https --tlsv1.2" <(grep -F "$releases/v1.2.3/bb-plugin-tutor-1.2.3.tgz.sha256" "$tmp/curl.log"); then
+    pass "latest resolves through the releases/latest redirect, over https only, and installs"
+else
+    flunk "latest resolves through the releases/latest redirect, over https only, and installs"
+fi
+# sha256sum's binary-mode marker is accepted too.
+publish_sha256 1.2.3 "$latest_sha *bb-plugin-tutor-1.2.3.tgz"$'\n'
+if fetch_latest && [ "$(tail -n1 "$case_dir/out")" = "resolved=1.2.3 sha=$latest_sha" ]; then pass "latest accepts a binary-mode .sha256 line"
+else flunk "latest accepts a binary-mode .sha256 line"; fi
+
+printf '%s' "https://github.com/lean-software-production/bb-plugin-tutor/releases" > "$serve/latest"
+expect_latest_reject "latest with no release (redirect to /releases) is refused" "is not a bb-plugin-tutor release tag"
+if nothing_downloaded; then pass "latest with no release downloads nothing"; else flunk "latest with no release downloads nothing"; fi
+for tag in vfoo v1.2 1.2.3 v1.2.3+build v01.2.3 "v1.2.3/../1.2.4" "v1.2.3%0a"; do
+    printf '%s' "$tags/$tag" > "$serve/latest"
+    expect_latest_reject "latest with the tag '$tag' is refused" "is not a bb-plugin-tutor release tag"
+done
+printf '%s' "https://github.com/someone-else/bb-plugin-tutor/releases/tag/v1.2.3" > "$serve/latest"
+expect_latest_reject "latest landing on another repository's release is refused" "is not a bb-plugin-tutor release tag"
+printf '%s' "http://github.com/lean-software-production/bb-plugin-tutor/releases/tag/v1.2.3" > "$serve/latest"
+expect_latest_reject "latest landing on plain http is refused" "is not a bb-plugin-tutor release tag"
+rm -f "$serve/latest"
+expect_latest_reject "a failed releases/latest request is reported" "could not resolve the latest release from $latest (curl exit 22)"
+
+printf '%s' "$tags/v1.2.3" > "$serve/latest"
+# check_sha256_file <label> <content>: a .sha256 of <content> is refused before
+# the tarball is even downloaded.
+check_sha256_file() {
+    publish_sha256 1.2.3 "$2"
+    expect_latest_reject "$1" "bb-plugin-tutor-1.2.3.tgz.sha256 must hold exactly one line"
+    if nothing_downloaded; then pass "$1: nothing downloaded or extracted"; else flunk "$1: nothing downloaded or extracted"; fi
+}
+check_sha256_file "an empty .sha256 is refused" ""
+check_sha256_file "a .sha256 with only the digest is refused" "$latest_sha"$'\n'
+check_sha256_file "a .sha256 naming another file is refused" "$latest_sha  bb-plugin-tutor-1.2.2.tgz"$'\n'
+check_sha256_file "a .sha256 with an upper-case digest is refused" "$(tr a-f A-F <<<"$latest_sha")  bb-plugin-tutor-1.2.3.tgz"$'\n'
+check_sha256_file "a .sha256 with a short digest is refused" "${latest_sha:1}  bb-plugin-tutor-1.2.3.tgz"$'\n'
+check_sha256_file "a .sha256 with two lines is refused" "$latest_sha  bb-plugin-tutor-1.2.3.tgz"$'\n'"$latest_sha  bb-plugin-tutor-1.2.3.tgz"$'\n'
+check_sha256_file "a .sha256 with a CRLF line is refused" "$latest_sha  bb-plugin-tutor-1.2.3.tgz"$'\r\n'
+check_sha256_file "a .sha256 with trailing text is refused" "$latest_sha  bb-plugin-tutor-1.2.3.tgz extra"$'\n'
+rm -f "$serve/v1.2.3/bb-plugin-tutor-1.2.3.tgz.sha256"
+expect_latest_reject "a missing .sha256 is reported" "could not download $releases/v1.2.3/bb-plugin-tutor-1.2.3.tgz.sha256 (curl exit 22)"
+publish_sha256 1.2.3 "$(printf '%064d' 0)  bb-plugin-tutor-1.2.3.tgz"$'\n'
+expect_latest_reject "a .sha256 that does not match the tarball is refused" "SHA-256 mismatch"
+if nothing_extracted; then pass "a mismatched .sha256 extracts nothing"; else flunk "a mismatched .sha256 extracts nothing"; fi
+# The archive checks still apply: a malicious latest release with a matching .sha256.
+sha="$(publish_bad 1.3.0 "symlink:bb-plugin-tutor-1.3.0/evil:/etc/passwd")"
+publish_sha256 1.3.0 "$sha  bb-plugin-tutor-1.3.0.tgz"$'\n'
+printf '%s' "$tags/v1.3.0" > "$serve/latest"
+expect_latest_reject "a malicious latest release is still screened" "may point outside"
 
 [ "$failures" = 0 ] || { echo "$failures tutor plugin fetch check(s) failed" >&2; exit 1; }
 echo 'tutor plugin fetch hermetic checks passed'

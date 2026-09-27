@@ -2,7 +2,7 @@
   "id": "tutor",
   "version": "0.5.0",
   "name": "Tutor coached course for BB",
-  "description": "Adds the Tutor BB plugin (a pinned, checksummed bb-plugin-tutor release) to the bb Feature's standalone server: a course outline in the sidebar and a coach thread per lesson that works one Gherkin Rule at a time. Requires the bb Feature in standalone mode.",
+  "description": "Adds the Tutor BB plugin (a checksummed bb-plugin-tutor release: the pinned one by default, or the newest with pluginVersion 'latest') to the bb Feature's standalone server: a course outline in the sidebar and a coach thread per lesson that works one Gherkin Rule at a time. Requires the bb Feature in standalone mode.",
   "documentationURL": "https://github.com/lean-software-production/devcontainer-features/tree/main/src/tutor",
   "options": {
     "course": {
@@ -54,13 +54,14 @@
     },
     "pluginVersion": {
       "type": "string",
+      "proposals": ["0.1.0", "latest"],
       "default": "0.1.0",
-      "description": "bb-plugin-tutor release downloaded from GitHub at image build, as a plain semantic version (no 'v' prefix or range). The default is the release this Feature pins, verified against its pinned SHA-256; any other version needs pluginSha256."
+      "description": "bb-plugin-tutor release downloaded from GitHub at image build: a plain semantic version (no 'v' prefix or range), or 'latest'. The default is the release this Feature pins, verified against its pinned SHA-256; any other version needs pluginSha256. 'latest' resolves to the newest release when the image is built (a prebuilt image keeps it until rebuilt) and is checked only against that release's own .sha256, which catches corruption but not a compromised release."
     },
     "pluginSha256": {
       "type": "string",
       "default": "",
-      "description": "SHA-256 (64 lower-case hex digits) of bb-plugin-tutor-<pluginVersion>.tgz. Required when pluginVersion is not the pinned default; with the default it must be empty or equal the pin. The release's own .sha256 file is never trusted."
+      "description": "SHA-256 (64 lower-case hex digits) of bb-plugin-tutor-<pluginVersion>.tgz. Required when pluginVersion is an explicit version other than the pinned default; with the default it must be empty or equal the pin; with 'latest' it must be empty. For an explicit version the release's own .sha256 file is never trusted."
     }
   },
   "postCreateCommand": "/usr/local/share/tutor/bin/tutor-feature-bootstrap",

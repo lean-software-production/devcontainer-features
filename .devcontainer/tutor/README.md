@@ -13,7 +13,12 @@ composes:
   into `/workspaces/capstone-project-starter`, and registers the starter's
   factory, `/workspaces/capstone-project-starter/tetris/.factory`, as the BB
   project `tetris/.factory`. It clones the upstream starter, not the
-  student's fork. On first start it selects the Tutor paper theme and switches off BB plugins a student
+  student's fork. It installs the newest
+  [bb-plugin-tutor](https://github.com/lean-software-production/bb-plugin-tutor)
+  release (`pluginVersion: "latest"`), resolved when the image is built, so a
+  prebuild keeps that release until it is rebuilt; see the
+  [tutor notes](../../src/tutor/NOTES.md#where-the-plugin-comes-from) for what
+  checks it then gets. On first start it selects the Tutor paper theme and switches off BB plugins a student
   does not need (Automations, Workflows, Connect and others; see its
   `disablePlugins` option); a student can turn any back on;
 - the [Claude Code](../../src/claude-code), [Codex](../../src/codex) and

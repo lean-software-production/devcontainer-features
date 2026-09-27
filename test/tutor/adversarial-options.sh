@@ -70,6 +70,11 @@ expect_reject 'a non-hex pluginSha256' 'pluginSha256 must be' PLUGINVERSION=0.2.
 expect_reject 'shell injection in pluginSha256' 'pluginSha256 must be' PLUGINVERSION=0.2.0 PLUGINSHA256="${sha:10};touch pwned"
 expect_reject 'another pluginVersion without pluginSha256' 'pluginSha256 is required' PLUGINVERSION=0.2.0
 expect_reject 'a pluginSha256 that differs from the pin' "differs from this Feature's pinned SHA-256" PLUGINSHA256="$sha"
+expect_reject 'latest with a pluginSha256' "pluginSha256 must be empty when pluginVersion is 'latest'" PLUGINVERSION=latest PLUGINSHA256="$sha"
+expect_reject 'latest with a malformed pluginSha256' "pluginSha256 must be empty when pluginVersion is 'latest'" PLUGINVERSION=latest PLUGINSHA256=nope
+expect_reject 'an upper-case LATEST' 'pluginVersion must be' PLUGINVERSION=LATEST
+expect_reject 'latest with a trailing space' 'pluginVersion must be' PLUGINVERSION='latest '
+expect_reject "a 'v' prefix on latest" 'pluginVersion must be' PLUGINVERSION=vlatest
 test ! -e "$tmp/pwned"
 test ! -e pwned
 
@@ -85,6 +90,8 @@ expect_reject 'plugin list and theme without the bb Feature' 'the bb Feature mus
     DISABLEPLUGINS=automations,tutor,provider-codex THEME=nord
 expect_reject 'another plugin release without the bb Feature' 'the bb Feature must be installed first' \
     PLUGINVERSION=0.2.0-rc.1 PLUGINSHA256="$sha"
+expect_reject 'the latest plugin release without the bb Feature' 'the bb Feature must be installed first' \
+    PLUGINVERSION=latest PLUGINSHA256=
 expect_reject 'the pinned plugin release, explicitly, without the bb Feature' 'the bb Feature must be installed first' \
     PLUGINVERSION="$(sed -n 's/^TUTOR_PLUGIN_PINNED_VERSION=//p' "$repo_root/src/tutor/plugin-pin.sh")" PLUGINSHA256=
 echo 'tutor adversarial option validation passed'

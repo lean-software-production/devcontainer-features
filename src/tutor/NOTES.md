@@ -5,7 +5,8 @@ Tutor is a BB plugin, developed in its own repository,
 (design in its [`docs/DESIGN.md`](https://github.com/lean-software-production/bb-plugin-tutor/blob/main/docs/DESIGN.md),
 local dev harness in
 [`scripts/tutor-dev/`](https://github.com/lean-software-production/bb-plugin-tutor/tree/main/scripts/tutor-dev)).
-This Feature is the lifecycle glue that puts a pinned release of it into the
+This Feature is the lifecycle glue that puts a release of it (the pinned one by
+default) into the
 [bb Feature](../bb)'s standalone server. It inherits that
 Feature's security model unchanged: one learner-owned BB bound to `127.0.0.1`,
 only the server port forwarded (keep it **Private** in the Codespaces Ports
@@ -41,6 +42,14 @@ a gzip tar with one top-level directory `bb-plugin-tutor-<pluginVersion>/`
 holding `package.json`, `package-lock.json` and the sources (no `dist/`, no
 `node_modules`).
 
+**Choosing the release.** `pluginVersion` picks one of three ways, each
+covered below: the default (the release this Feature version pins, with its
+pinned SHA-256), an explicit version with the `pluginSha256` you computed, or
+`latest`, the newest release, checked only against its own `.sha256`. The
+installed version is printed at the end of the image build (`Installed the
+Tutor plugin <version> ...`, read from the staged `package.json`, so `latest`
+shows the version it resolved to).
+
 **Pinning.** Each Feature version pins one plugin release and its SHA-256 in
 [`plugin-pin.sh`](plugin-pin.sh), the only place either is recorded (the
 `pluginVersion` default in `devcontainer-feature.json` must name the same
@@ -48,8 +57,8 @@ version; `test/tutor/plugin-fetch-hermetic.sh` checks that). With the default
 `pluginVersion` the download is verified against that pinned SHA-256, and a
 `pluginSha256` given as well must equal it: a build fails rather than guess
 which of two checksums was meant. The release also publishes a `.sha256`
-file; the Feature never reads it, since anyone able to replace the tarball
-could replace that too.
+file; for a pinned or explicit version the Feature never reads it, since
+anyone able to replace the tarball could replace that too.
 
 **Using a newer plugin release** without waiting for a new Feature version:
 compute the tarball's SHA-256 yourself and set both options.
@@ -67,9 +76,34 @@ sha256sum "bb-plugin-tutor-$v.tgz"
 }
 ```
 
-`pluginSha256` is required whenever `pluginVersion` is not the pinned one.
-The plugin must still suit the bb version the bb Feature installs and read
-`config.json` schema version 1.
+`pluginSha256` is required whenever `pluginVersion` is an explicit version
+other than the pinned one. The plugin must still suit the bb version the bb
+Feature installs and read `config.json` schema version 1.
+
+**Tracking the newest release** (`"pluginVersion": "latest"`, which this
+repository's course Codespace uses). At image build the Feature follows the
+redirect of
+`https://github.com/lean-software-production/bb-plugin-tutor/releases/latest`
+(not the GitHub API, so no rate limit applies) and reads the version from the
+tag it lands on, `.../releases/tag/v<version>`, which must be a plain semantic
+version; with no release published, or an unexpected tag, the build fails. It
+logs `tutor plugin fetch: latest is <version>`, downloads that release's
+`bb-plugin-tutor-<version>.tgz.sha256`, requires exactly one line of 64
+lower-case hex digits naming `bb-plugin-tutor-<version>.tgz`, and then
+downloads and screens the tarball exactly as for a pinned version, against
+that digest. Two caveats:
+
+- **Trust.** With no pin, the release's own `.sha256` is the only check. It
+  catches a corrupted or truncated download, not a compromised release:
+  whoever can publish a release can publish a matching `.sha256`. Use an
+  explicit version and `pluginSha256` where that matters. `pluginSha256` must
+  be empty with `latest`, since no checksum can apply to a version not yet
+  known.
+- **When it is resolved.** Only when the image is built. A Codespaces
+  prebuild, or any cached image, keeps the release it resolved until the
+  image is rebuilt; a new plugin release reaches students on the next
+  prebuild or rebuild, not on restart. The same configuration built on two
+  days can install two different releases.
 
 **Network.** The image build needs HTTPS access to `github.com` (release
 downloads redirect to `objects.githubusercontent.com`), as well as to the npm
@@ -82,14 +116,16 @@ when the container starts, apart from the optional course and starter clones.
    characters or shell metacharacters; `factory` and `starter` each different
    from `course`; `courseRepo` and `starterRepo` empty or an `https://` URL
    without credentials, query or fragment; `starterRepo` only with a
-   `starter`; `pluginVersion` a plain semantic version (`MAJOR.MINOR.PATCH`
-   with an optional pre-release; no `v` prefix, range or build metadata);
-   `pluginSha256` empty or 64 lower-case hex digits, required for any
-   `pluginVersion` but the pinned one and equal to the pin for that one.
+   `starter`; `pluginVersion` `latest` or a plain semantic version
+   (`MAJOR.MINOR.PATCH` with an optional pre-release; no `v` prefix, range or
+   build metadata); `pluginSha256` empty or 64 lower-case hex digits,
+   required for any explicit `pluginVersion` but the pinned one, equal to the
+   pin for that one, and empty for `latest`.
 2. Checks that the bb Feature is installed in `standalone` mode.
-3. Downloads the plugin release with `curl` (HTTPS and TLS 1.2 or later only,
-   redirects included, with retries) and checks its SHA-256 before reading
-   it. It then lists the archive and refuses any member that is absolute, has
+3. For `latest`, resolves the version and reads the expected SHA-256 from
+   the release's `.sha256` (see above). Downloads the plugin release with
+   `curl` (HTTPS and TLS 1.2 or later only, redirects included, with
+   retries) and checks its SHA-256 before reading it. It then lists the archive and refuses any member that is absolute, has
    a `..` (or empty or `.`) segment, lies outside `bb-plugin-tutor-<version>/`,
    is a symlink whose target is absolute or contains `..`, is a hard link
    outside that directory, is not a plain file, directory or link, or has a
@@ -265,7 +301,11 @@ CI runs:
   `curl` serves crafted tarballs, and a wrong checksum (which must extract
   nothing), a wrong top-level directory, `..`, absolute and escaping-link
   members, a mismatched `package.json`, a missing lockfile, a bundled `dist/`
-  and a failed download are each refused;
+  and a failed download are each refused; for `latest`, the resolved release
+  installs, and a redirect without a release tag, an odd tag, another
+  repository's tag, a malformed, multi-line or wrong-file `.sha256` (which
+  must download nothing) and a `.sha256` that does not match the tarball are
+  each refused;
 - a bring-up of the Codespace entry point itself (`codespace-entry.sh`, on
   ports 48886/48887 and with `/workspaces` paths moved under the home
   directory), including the starter clone and its factory registered as

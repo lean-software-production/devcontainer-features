@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # shellcheck source-path=SCRIPTDIR
 # Dev Container Feature installer for Tutor. This runs as root while the image
-# is built, after the bb Feature. It downloads a pinned, checksummed release of
-# the plugin (lean-software-production/bb-plugin-tutor) and prebuilds it so
+# is built, after the bb Feature. It downloads a checksummed release of the
+# plugin (lean-software-production/bb-plugin-tutor; by default the pinned one,
+# or the newest with pluginVersion "latest") and prebuilds it so
 # that nothing is fetched when the container starts; it never starts BB or
 # creates user state.
 set -euo pipefail
@@ -74,13 +75,20 @@ check_repo_text courseRepo "$TUTOR_COURSE_REPO"
 check_repo_text starterRepo "$TUTOR_STARTER_REPO"
 [ -z "$TUTOR_STARTER_REPO" ] || [ -n "$TUTOR_STARTER" ] || fail "starterRepo needs a starter to clone into; set starter too, or leave starterRepo empty."
 # pluginVersion and pluginSha256. The pinned version uses the pinned SHA-256;
-# a pluginSha256 given with it must equal the pin. Any other version needs its
-# own pluginSha256, because the release's .sha256 file is never trusted.
-tutor_plugin_valid_version "$TUTOR_PLUGIN_VERSION" \
-    || fail "pluginVersion must be a plain semantic version such as 0.1.0 (no 'v' prefix, range or build metadata); received '$TUTOR_PLUGIN_VERSION'."
-[ -z "$TUTOR_PLUGIN_SHA256" ] || tutor_plugin_valid_sha256 "$TUTOR_PLUGIN_SHA256" \
+# a pluginSha256 given with it must equal the pin. Any other explicit version
+# needs its own pluginSha256, because for those the release's .sha256 file is
+# never trusted. "latest" is resolved when the plugin is fetched below and is
+# checked only against that release's own .sha256 (corruption, not a
+# compromised release), so no pluginSha256 can apply to it.
+[ "$TUTOR_PLUGIN_VERSION" = latest ] || tutor_plugin_valid_version "$TUTOR_PLUGIN_VERSION" \
+    || fail "pluginVersion must be 'latest' or a plain semantic version such as 0.1.0 (no 'v' prefix, range or build metadata); received '$TUTOR_PLUGIN_VERSION'."
+[ -z "$TUTOR_PLUGIN_SHA256" ] || [ "$TUTOR_PLUGIN_VERSION" = latest ] || tutor_plugin_valid_sha256 "$TUTOR_PLUGIN_SHA256" \
     || fail "pluginSha256 must be empty or 64 lower-case hex digits: the SHA-256 of bb-plugin-tutor-<pluginVersion>.tgz."
-if [ "$TUTOR_PLUGIN_VERSION" = "$TUTOR_PLUGIN_PINNED_VERSION" ]; then
+if [ "$TUTOR_PLUGIN_VERSION" = latest ]; then
+    [ -z "$TUTOR_PLUGIN_SHA256" ] \
+        || fail "pluginSha256 must be empty when pluginVersion is 'latest': the version is only known when the image is built, so no checksum can be given for it. Set pluginVersion to an explicit version to pin a checksum."
+    tutor_plugin_sha256=
+elif [ "$TUTOR_PLUGIN_VERSION" = "$TUTOR_PLUGIN_PINNED_VERSION" ]; then
     [ -z "$TUTOR_PLUGIN_SHA256" ] || [ "$TUTOR_PLUGIN_SHA256" = "$TUTOR_PLUGIN_PINNED_SHA256" ] \
         || fail "pluginSha256 differs from this Feature's pinned SHA-256 for plugin $TUTOR_PLUGIN_VERSION; leave pluginSha256 empty to use the pin."
     tutor_plugin_sha256="$TUTOR_PLUGIN_PINNED_SHA256"
@@ -113,15 +121,23 @@ BB_CLI="$(dirname "$BB_FEATURE_APP_BIN")/bb"
 workdir="$(mktemp -d)"
 trap 'rm -rf "$workdir"' EXIT
 
-# Stage the plugin sources from the pinned release. The tarball is verified
+# Stage the plugin sources from the chosen release. The tarball is verified
 # against the SHA-256 before it is read, and every member is checked before it
 # is extracted; it carries no node_modules or dist, which are built below.
-tutor_plugin_valid_sha256 "$tutor_plugin_sha256" \
+[ "$TUTOR_PLUGIN_VERSION" = latest ] || tutor_plugin_valid_sha256 "$tutor_plugin_sha256" \
     || fail "this Feature's pinned SHA-256 for plugin $TUTOR_PLUGIN_PINNED_VERSION is not set yet (plugin-pin.sh holds a placeholder). Set pluginVersion and pluginSha256 to a released plugin."
 rm -rf "$PLUGIN_DIR" "$TOOLCHAIN_DIR"
 install -d -m 0755 "$SHARE_DIR" "$SHARE_DIR/bin" "$PLUGIN_DIR" "$TOOLCHAIN_DIR"
-tutor_plugin_fetch "$TUTOR_PLUGIN_VERSION" "$tutor_plugin_sha256" "$workdir" "$PLUGIN_DIR" \
-    || fail "could not install bb-plugin-tutor $TUTOR_PLUGIN_VERSION; see the message above."
+if [ "$TUTOR_PLUGIN_VERSION" = latest ]; then
+    tutor_plugin_fetch_latest "$workdir" "$PLUGIN_DIR" \
+        || fail "could not install the latest bb-plugin-tutor release${TUTOR_PLUGIN_LATEST_VERSION:+ ($TUTOR_PLUGIN_LATEST_VERSION)}; see the message above."
+    tutor_plugin_sha256="$TUTOR_PLUGIN_LATEST_SHA256"
+    tutor_plugin_checked="the latest release, checked against its own .sha256 only"
+else
+    tutor_plugin_fetch "$TUTOR_PLUGIN_VERSION" "$tutor_plugin_sha256" "$workdir" "$PLUGIN_DIR" \
+        || fail "could not install bb-plugin-tutor $TUTOR_PLUGIN_VERSION; see the message above."
+    tutor_plugin_checked="checked against the pinned or given SHA-256"
+fi
 
 # Runtime dependencies only: bb shims the SDK and UI packages for plugins, and
 # none of the runtime dependencies needs an install script.
@@ -197,4 +213,4 @@ ln -sfn "$SHARE_DIR/bin/tutor-feature-autostart" /usr/local/bin/tutor-feature-au
 ln -sfn "$SHARE_DIR/bin/tutor-keepalive" /usr/local/bin/tutor-keepalive
 
 plugin_version="$(node -e 'process.stdout.write(require(process.argv[1]).version)' "$PLUGIN_DIR/package.json")"
-echo "Installed the Tutor plugin ${plugin_version} (sha256 ${tutor_plugin_sha256}) in ${PLUGIN_DIR}; it is path-installed into BB when the container starts."
+echo "Installed the Tutor plugin ${plugin_version} (sha256 ${tutor_plugin_sha256}, ${tutor_plugin_checked}) in ${PLUGIN_DIR}; it is path-installed into BB when the container starts."

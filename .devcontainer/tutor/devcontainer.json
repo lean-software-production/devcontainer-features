@@ -26,6 +26,10 @@
     "./features/codex": {},
     "./features/pi": {},
     "./features/tutor": {
+      // The course tracks the newest bb-plugin-tutor release rather than the
+      // Feature's pin. It is resolved when the image is built, so a prebuild
+      // keeps that release until the image is rebuilt.
+      "pluginVersion": "latest",
       "course": "/workspaces/tutorial",
       "courseRepo": "https://github.com/lean-software-production/tutorial.git",
       "starter": "/workspaces/capstone-project-starter",

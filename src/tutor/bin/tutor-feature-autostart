@@ -3,7 +3,8 @@
 # postStartCommand, as the remote user, after bb-feature-autostart: wait for the
 # local BB, path-install the prebuilt plugin once, switch off the plugins a
 # student does not need, select the course outline and the Tutor theme, and
-# register the course and factory as projects. Every step is idempotent, and
+# register the course and the student's repo (the starter, or with no starter
+# the factory, as before 0.6.0) as projects. Every step is idempotent, and
 # every choice a student can undo is made at most once per BB state directory,
 # so the hook is safe on every container start.
 set -euo pipefail
@@ -135,19 +136,30 @@ project_name() {
     printf '%s' "$name"
 }
 
+# register_project <label> <dir> [within]: register <dir> as a BB project
+# unless a project already has it as its local source. With "within", a
+# project anywhere inside <dir> counts too, and <dir> is named by its basename.
 register_project() {
-    local label="$1" dir="$2" projects
+    local label="$1" dir="$2" within="${3:-}" projects found name
     [ -n "$dir" ] || return 0
     if [ ! -d "$dir" ]; then
         tutor_log "no $label at $dir yet; not registering it"
         return 0
     fi
     projects="$(tutor_bb project list --json)" || { tutor_fail "cannot list BB projects"; return 1; }
-    if [ -n "$(printf '%s' "$projects" | tutor_json project "$dir")" ]; then
-        tutor_log "$label $dir is already a BB project"
-        return 0
+    if [ -n "$within" ]; then
+        found="$(printf '%s' "$projects" | tutor_json project-within "$dir")"
+        name="$(basename -- "$dir")"
+    else
+        found="$(printf '%s' "$projects" | tutor_json project "$dir")"
+        name="$(project_name "$dir")"
     fi
-    tutor_bb project create --name "$(project_name "$dir")" --root "$dir" >/dev/null || { tutor_fail "cannot register the $label $dir as a BB project"; return 1; }
+    case "$found" in
+        "") ;;
+        yes) tutor_log "$label $dir is already a BB project"; return 0 ;;
+        *) tutor_log "$found is already a BB project inside the $label $dir; not registering the $label"; return 0 ;;
+    esac
+    tutor_bb project create --name "$name" --root "$dir" >/dev/null || { tutor_fail "cannot register the $label $dir as a BB project"; return 1; }
     tutor_log "registered the $label $dir as a BB project"
 }
 
@@ -239,5 +251,13 @@ fi
 disable_plugins || status=1
 select_theme || status=1
 register_project course "$TUTOR_COURSE" || status=1
-register_project factory "$TUTOR_FACTORY" || status=1
+# The starter is the student's repo, and coach threads start there. A project
+# at or inside it, such as the tetris/.factory a 0.5.0 Codespace registered,
+# already holds the student's threads, so the starter is not added beside it.
+# Without a starter the factory is the project, as before 0.6.0.
+if [ -n "$TUTOR_STARTER" ]; then
+    register_project starter "$TUTOR_STARTER" within || status=1
+else
+    register_project factory "$TUTOR_FACTORY" || status=1
+fi
 exit "$status"

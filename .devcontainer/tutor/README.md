@@ -10,10 +10,10 @@ composes:
   [tutorial](https://github.com/lean-software-production/tutorial) into
   `/workspaces/tutorial` and the
   [capstone-project-starter](https://github.com/lean-software-production/capstone-project-starter)
-  into `/workspaces/capstone-project-starter`, and registers the starter's
-  factory, `/workspaces/capstone-project-starter/tetris/.factory`, as the BB
-  project `tetris/.factory`. It clones the upstream starter, not the
-  student's fork. It installs the newest
+  into `/workspaces/capstone-project-starter`, and registers the starter
+  itself as the BB project `capstone-project-starter` (tutor Feature 0.6.0:
+  with `starter` set, the starter is the project and `factory` is only a hint
+  in `config.json`). It clones the upstream starter, not the student's fork. It installs the newest
   [bb-plugin-tutor](https://github.com/lean-software-production/bb-plugin-tutor)
   release (`pluginVersion: "latest"`), resolved when the image is built, so a
   prebuild keeps that release until it is rebuilt; see the
@@ -79,7 +79,8 @@ references and delete `features/` and the sync script.
 devcontainer CLI, changing only what a local Docker host cannot provide like
 Codespaces does: ports 48886/48887 instead of 38886/38887, and home-directory
 paths instead of `/workspaces`. It checks the course and starter clones, the
-factory project `tetris/.factory`, the Tutor plugin, the outline, the three
+starter project `capstone-project-starter` (and no factory project), the
+starter as `config.json`'s `repo`, the Tutor plugin, the outline, the three
 agent CLIs (on `PATH` and reported installed by `bb updates status`), the
 switched-off plugins, the theme, and that `tutor-keepalive` returns at once
 outside Codespaces.

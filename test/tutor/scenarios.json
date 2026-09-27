@@ -42,5 +42,28 @@
       }
     },
     "overrideFeatureInstallOrder": ["./bb", "./tutor"]
+  },
+  "starter_workspace": {
+    "image": "mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie",
+    "remoteUser": "node",
+    "features": {
+      "bb": {
+        "version": "0.43.4",
+        "mode": "standalone",
+        "autoStart": true,
+        "serverPort": "49086",
+        "hostDaemonPort": "49087"
+      },
+      "tutor": {
+        "course": "/home/node/absent-course",
+        "courseRepo": "",
+        "starter": "${containerWorkspaceFolder}",
+        "starterRepo": "",
+        "selectOutline": false,
+        "disablePlugins": "",
+        "theme": ""
+      }
+    },
+    "overrideFeatureInstallOrder": ["./bb", "./tutor"]
   }
 }

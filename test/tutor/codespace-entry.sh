@@ -59,12 +59,15 @@ check() {
 check "bb is running" in_container bb-feature-status
 check "the course was cloned" in_container git -C /home/node/tutorial rev-parse --verify HEAD
 check "the starter was cloned" in_container git -C /home/node/capstone-project-starter rev-parse --verify HEAD
-check "the starter's factory is a BB project named tetris/.factory" in_container bash -c 'bb project list --json | node -e "
+check "the starter is the BB project named capstone-project-starter, and its factory is not" in_container bash -c 'bb project list --json | node -e "
 let s = \"\"; process.stdin.on(\"data\", (d) => (s += d)).on(\"end\", () => {
-  const factory = \"/home/node/capstone-project-starter/tetris/.factory\";
-  const p = JSON.parse(s).find((x) => (x.sources || []).some((src) => src.type === \"local_path\" && src.path === factory));
-  if (!p || p.name !== \"tetris/.factory\") { console.error(\"the factory is not a BB project named tetris/.factory:\", p); process.exit(1); }
+  const starter = \"/home/node/capstone-project-starter\";
+  const at = (dir) => JSON.parse(s).find((x) => (x.sources || []).some((src) => src.type === \"local_path\" && src.path === dir));
+  const p = at(starter);
+  if (!p || p.name !== \"capstone-project-starter\") { console.error(\"the starter is not a BB project named capstone-project-starter:\", p); process.exit(1); }
+  if (at(starter + \"/tetris/.factory\")) { console.error(\"the factory was registered too\"); process.exit(1); }
 });"'
+check "config.json names the starter as the repo" in_container node -e 'const c = require("/usr/local/etc/tutor/config.json"); if (c.repo !== "/home/node/capstone-project-starter") { console.error(c); process.exit(1); }'
 check "the Tutor plugin is running" in_container bash -c 'bb plugin list --json | node -e "
 let s = \"\"; process.stdin.on(\"data\", (d) => (s += d)).on(\"end\", () => {
   const p = JSON.parse(s).plugins.find((x) => x.id === \"tutor\");

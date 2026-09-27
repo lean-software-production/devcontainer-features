@@ -45,6 +45,10 @@ strip_trailing_slashes() { local value="$1"; while [ "${#value}" -gt 1 ] && [[ "
 TUTOR_COURSE="$(strip_trailing_slashes "$TUTOR_COURSE")"
 TUTOR_FACTORY="$(strip_trailing_slashes "$TUTOR_FACTORY")"
 TUTOR_STARTER="$(strip_trailing_slashes "$TUTOR_STARTER")"
+# Codespaces and the devcontainer CLI substitute ${containerWorkspaceFolder} in
+# Feature options; a tool that does not would leave the text as it is.
+# shellcheck disable=SC2016 # the literal text is the message
+[[ "$TUTOR_STARTER" != *'${'* ]] || fail "starter is '$TUTOR_STARTER', which holds an unsubstituted \${...} variable: whatever built this container did not substitute it. Set starter to an absolute path, or build with the devcontainer CLI or Codespaces, which substitute \${containerWorkspaceFolder}."
 valid_path "$TUTOR_COURSE" || fail "course must be an absolute path without dot segments, control characters, quotes or shell metacharacters; received '$TUTOR_COURSE'."
 [ -z "$TUTOR_STARTER" ] || valid_path "$TUTOR_STARTER" || fail "starter must be empty or an absolute path without dot segments, control characters, quotes or shell metacharacters; received '$TUTOR_STARTER'."
 [ -z "$TUTOR_STARTER" ] || [ "$TUTOR_STARTER" != "$TUTOR_COURSE" ] || fail "starter and course must be different directories."
@@ -179,17 +183,19 @@ else
     echo "tutor Feature: the remote user's home is unknown, so config.json has no dataDir." >&2
 fi
 
-# The plugin reads course/factory/dataDir from this JSON; the hooks read options.tsv.
-# schemaVersion 1 is the contract with bb-plugin-tutor, which treats a missing
-# value as 1 and refuses any other.
+# The plugin reads course/repo/factory/dataDir from this JSON; the hooks read
+# options.tsv. schemaVersion 1 is the contract with bb-plugin-tutor, which
+# treats a missing value as 1, refuses any other and ignores unknown keys, so
+# the optional repo (the starter: the student's repo) needs no new version.
 install -d -m 0755 "$CONFIG_DIR"
 node -e '
-const [course, factory, dataDir] = process.argv.slice(1);
+const [course, repo, factory, dataDir] = process.argv.slice(1);
 const config = { schemaVersion: 1, course };
+if (repo) config.repo = repo;
 if (factory) config.factory = factory;
 if (dataDir) config.dataDir = dataDir;
 process.stdout.write(JSON.stringify(config, null, 2) + "\n");
-' "$TUTOR_COURSE" "$TUTOR_FACTORY" "$tutor_data_dir" > "$CONFIG_DIR/config.json"
+' "$TUTOR_COURSE" "$TUTOR_STARTER" "$TUTOR_FACTORY" "$tutor_data_dir" > "$CONFIG_DIR/config.json"
 write_option() { printf '%s\t%s\n' "$1" "$2"; }
 {
     write_option COURSE "$TUTOR_COURSE"

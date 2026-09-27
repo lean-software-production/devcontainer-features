@@ -2,7 +2,8 @@
   // Codespace entry point for the Tutor course: a private, loopback-only BB
   // with the Tutor plugin, the Claude Code, Codex and Pi agent CLIs, and the
   // public tutorial and capstone-project-starter cloned next to this repo; the
-  // student's factory is the starter's tetris/.factory. The Features are
+  // starter is the BB project, and Tutor finds its factory (tetris/.factory,
+  // then factory/ from lesson 4) inside it. The Features are
   // local copies of src/*; refresh them with
   // .devcontainer/tutor/sync-features.sh (see README.md here).
   "name": "Tutor course (BB standalone + Tutor)",
@@ -34,7 +35,7 @@
       "courseRepo": "https://github.com/lean-software-production/tutorial.git",
       "starter": "/workspaces/capstone-project-starter",
       "starterRepo": "https://github.com/lean-software-production/capstone-project-starter.git",
-      "factory": "/workspaces/capstone-project-starter/tetris/.factory",
+      "factory": "",
       "selectOutline": true
     }
   },

@@ -138,6 +138,18 @@ mkdir -p "\${@: -1}"
 FAKE
 chmod 755 "$fake/bin/git"
 
+# The 0.5.0 layout: no starter, so the factory is the BB project.
+legacy_options() {
+    set_options "$tutor_share/options.tsv" COURSE "$course" COURSE_REPO https://example.invalid/course.git \
+        STARTER "" STARTER_REPO "" FACTORY "${1:-$factory}" SELECT_OUTLINE true DISABLE_PLUGINS "$default_disable" THEME plugin:tutor:paper
+}
+# The 0.6.0 layout: the starter is the student's repo and the BB project; the
+# factory, if set, lives inside it.
+starter_options() {
+    set_options "$tutor_share/options.tsv" COURSE "$course" COURSE_REPO "" STARTER "$starter" STARTER_REPO "" \
+        FACTORY "${1-}" SELECT_OUTLINE true DISABLE_PLUGINS "" THEME ""
+}
+
 reset_world() {
     rm -rf "$state" "$course" "$factory" "$starter" "$fake"/{calls.log,git.log,projects,plugin-root,plugin-status,down,install-fails,reload-fails,git-fails,toolchain-at-install,disable-fails}
     mkdir -p "$state"
@@ -167,6 +179,7 @@ plugin_status() { awk -v id="$1" '$1 == id { print $2 }' "$fake/plugins"; }
 
 # --- autostart ------------------------------------------------------------
 reset_world
+legacy_options
 mkdir -p "$course"
 run_hook tutor-feature-autostart
 expect "first start succeeds" test "$rc" = 0
@@ -210,16 +223,70 @@ expect "a disabled plugin is left off" test "$(cat "$fake/plugin-status")" = dis
 expect "a disabled plugin is not reloaded" bash -c "! grep -q 'plugin reload' '$fake/calls.log'"
 expect "a disabled plugin passes the hook" test "$rc" = 0
 
-# The starter's factory is a dot-folder, which alone would name every factory
-# ".factory"; its project is named after the codebase too.
+# Without a starter (0.5.0 options) a dot-folder factory is the project, named
+# after the codebase too, since ".factory" alone would name every factory alike.
 reset_world
-set_options "$tutor_share/options.tsv" COURSE "$course" COURSE_REPO "" STARTER "$starter" STARTER_REPO "" \
-    FACTORY "$starter/tetris/.factory" SELECT_OUTLINE true DISABLE_PLUGINS "" THEME ""
+legacy_options "$starter/tetris/.factory"
 mkdir -p "$course" "$starter/tetris/.factory"
 run_hook tutor-feature-autostart
-expect "a factory inside the starter is registered" grep -qxF "$starter/tetris/.factory" "$fake/projects"
+expect "without a starter the factory is registered" grep -qxF "$starter/tetris/.factory" "$fake/projects"
 expect "a dot-folder factory is named <codebase>/<folder>" calls_have "project create --name tetris/.factory --root $starter/tetris/.factory"
-expect "the starter itself is not registered" bash -c "! grep -qxF '$starter' '$fake/projects'"
+expect "without a starter option the starter folder is not registered" bash -c "! grep -qxF '$starter' '$fake/projects'"
+
+# With a starter, the starter (the student's repo) is the project, named after
+# its folder, and the factory inside it is never registered.
+reset_world
+starter_options "$starter/tetris/.factory"
+mkdir -p "$course" "$starter/tetris/.factory"
+run_hook tutor-feature-autostart
+expect "a start with a starter succeeds" test "$rc" = 0
+expect "the starter is registered as the project" grep -qxF "$starter" "$fake/projects"
+expect "the starter project is named after its folder" calls_have "project create --name capstone-project-starter --root $starter"
+expect "the factory inside the starter is not registered" bash -c "! grep -qxF '$starter/tetris/.factory' '$fake/projects'"
+: > "$fake/calls.log"
+run_hook tutor-feature-autostart
+expect "the starter is registered only once" test "$(grep -cxF "$starter" "$fake/projects")" = 1
+expect "a registered starter is logged" out_has "starter $starter is already a BB project"
+
+reset_world
+starter_options
+mkdir -p "$course" "$starter"
+run_hook tutor-feature-autostart
+expect "a starter with no factory option is registered" grep -qxF "$starter" "$fake/projects"
+
+reset_world
+starter_options "$factory"
+mkdir -p "$course" "$factory"
+run_hook tutor-feature-autostart
+expect "a missing starter is skipped" out_has "no starter at $starter yet"
+expect "a missing starter does not fall back to the factory" bash -c "! grep -qxF '$factory' '$fake/projects'"
+
+# A 0.5.0 Codespace registered <starter>/tetris/.factory; its threads live
+# there, so the starter is not registered on top of it.
+reset_world
+starter_options "$starter/tetris/.factory"
+mkdir -p "$course" "$starter/tetris/.factory"
+printf '%s\n' "$starter/tetris/.factory" > "$fake/projects"
+run_hook tutor-feature-autostart
+expect "a project inside the starter passes the hook" test "$rc" = 0
+expect "a project inside the starter keeps the starter unregistered" bash -c "! grep -qxF '$starter' '$fake/projects'"
+expect "a project inside the starter is explained" out_has "$starter/tetris/.factory is already a BB project inside the starter $starter"
+
+reset_world
+starter_options
+mkdir -p "$course" "$starter/sub"
+printf '%s\n' "$starter/" > "$fake/projects"
+run_hook tutor-feature-autostart
+expect "a project at the starter spelt with a trailing slash counts" bash -c "! grep -qxF '$starter' '$fake/projects'"
+expect "a project at the starter is logged" out_has "starter $starter is already a BB project"
+
+# A sibling that merely shares the starter's name as a prefix is not inside it.
+reset_world
+starter_options
+mkdir -p "$course" "$starter"
+printf '%s\n' "$starter-old" > "$fake/projects"
+run_hook tutor-feature-autostart
+expect "a sibling with the starter's name as a prefix does not count" grep -qxF "$starter" "$fake/projects"
 
 reset_world
 printf '/elsewhere/tutor' > "$fake/plugin-root"; echo running > "$fake/plugin-status"

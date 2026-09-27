@@ -43,6 +43,7 @@ check "frontend bundle was prebuilt against the packaged bb" bash -c 'grep -q "\
 check "only runtime dependencies are installed" bash -c 'test -d /usr/local/share/tutor/plugin/node_modules/zod && test ! -e /usr/local/share/tutor/plugin/node_modules/typescript && test ! -e /usr/local/share/tutor/plugin/node_modules/@get-bb'
 check "bb build toolchain is kept for offline installs" bash -c 'ls -d /usr/local/share/tutor/toolchain/toolchain-*/node_modules/esbuild'
 check "plugin config names the course and factory" bash -c 'node -e "const c=require(\"/usr/local/etc/tutor/config.json\"); process.exit(c.course===\"/home/node/course\" && c.factory===\"/home/node/my-factory\" ? 0 : 1)"'
+check "a factory-only config has no repo" bash -c 'node -e "const c=require(\"/usr/local/etc/tutor/config.json\"); process.exit(\"repo\" in c ? 1 : 0)"'
 check "plugin config is schema version 1" bash -c 'node -e "const c=require(\"/usr/local/etc/tutor/config.json\"); process.exit(c.schemaVersion===1 ? 0 : 1)"'
 check "plugin config names the BB state directory" bash -c 'node -e "const c=require(\"/usr/local/etc/tutor/config.json\"); process.exit(c.dataDir===process.argv[1] ? 0 : 1)" "$state"'
 check "config and options are root-owned and not writable by others" bash -c 'for f in /usr/local/etc/tutor/config.json /usr/local/share/tutor/options.tsv /usr/local/share/tutor/plugin.sha256; do test "$(stat -c %u "$f")" = 0 && test $((8#$(stat -c %a "$f") & 022)) = 0 || exit 1; done'

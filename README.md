@@ -87,12 +87,17 @@ course Codespace. See the [Tutor notes](src/tutor/NOTES.md).
 ## Publishing
 
 Features are published to `ghcr.io` as OCI artifacts by the
-**Release features** workflow (`workflow_dispatch`). The first publish creates
+**Release features** workflow. It runs by itself once **Test features** passes
+on a push to `main`, and publishes every Feature whose version is not on
+`ghcr.io` yet, so merging a version bump releases it and any other merge
+publishes nothing. It can also be run by hand (`workflow_dispatch`), with
+publishing unticked to validate metadata only. The first publish creates
 a private package; make it public once at
 `https://github.com/orgs/lean-software-production/packages` so other repos can
 pull it without authenticating.
 
-Bump `version` in `src/<feature>/devcontainer-feature.json` before each release.
+Bump `version` in `src/<feature>/devcontainer-feature.json` in the pull request
+that changes the Feature; the release follows its merge.
 Consumers pinning `:1` pick up minor and patch releases automatically.
 
 ## Testing

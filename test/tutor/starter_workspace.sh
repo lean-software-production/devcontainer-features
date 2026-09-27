@@ -13,7 +13,7 @@ export BB_SERVER_URL=http://127.0.0.1:49086 BB_HOST_DAEMON_PORT=49087 BB_DATA_DI
 
 check "the workspace variable was substituted" bash -c 'grep -qxF "STARTER	$workspace" /usr/local/share/tutor/options.tsv'
 check "plugin config names the starter as the repo" bash -c 'node -e "const c=require(\"/usr/local/etc/tutor/config.json\"); process.exit(c.schemaVersion===1 && c.repo===process.env.workspace && !(\"factory\" in c) ? 0 : 1)"'
-check "the starter workspace is not cloned" bash -c 'out=$(tutor-feature-bootstrap 2>&1) && grep -qF "starter found at $workspace" <<<"$out" && ! grep -q cloning <<<"$out"'
+check "the starter workspace is not cloned" bash -c 'out=$(tutor-feature-bootstrap 2>&1) && grep -qF "starter found at $workspace" <<<"$out" && ! grep -qF "into $workspace" <<<"$out"'
 check "the starter is the BB project, named after its folder" bash -c 'bb project list --json | node -e "
 let s = \"\"; process.stdin.on(\"data\", (d) => (s += d)).on(\"end\", () => {
   const w = process.env.workspace;

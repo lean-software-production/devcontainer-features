@@ -35,3 +35,15 @@ jobs:
           devcontainer features test --features codex
           --base-image mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie
           --remote-user node --skip-duplicated .
+
+      - name: Test BB Feature
+        run: >-
+          devcontainer features test --features bb
+          --base-image mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie
+          --remote-user node --skip-duplicated .
+
+      - name: Test BB option rejection
+        run: bash test/bb/adversarial-options.sh
+
+      - name: Test BB lifecycle adversarial cases
+        run: sudo bash test/bb/adversarial-runtime.sh

@@ -1,0 +1,32 @@
+{
+  "standalone": {
+    "image": "mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie",
+    "remoteUser": "node",
+    "features": {
+      "bb": {
+        "version": "0.43.3",
+        "mode": "standalone",
+        "autoStart": true,
+        "serverPort": "48186",
+        "hostDaemonPort": "48187",
+        "dataDir": "/tmp/bb feature state",
+        "appUrl": "auto"
+      }
+    }
+  },
+  "custom_origin": {
+    "image": "mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie",
+    "remoteUser": "node",
+    "features": {
+      "bb": {
+        "version": "0.43.3",
+        "mode": "standalone",
+        "autoStart": true,
+        "serverPort": "48286",
+        "hostDaemonPort": "48287",
+        "dataDir": "/tmp/bb custom state",
+        "appUrl": "https://bb.example.test"
+      }
+    }
+  }
+}

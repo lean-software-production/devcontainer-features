@@ -54,8 +54,8 @@
     },
     "pluginVersion": {
       "type": "string",
-      "proposals": ["0.1.0", "latest"],
-      "default": "0.1.0",
+      "proposals": ["0.2.0", "latest"],
+      "default": "0.2.0",
       "description": "bb-plugin-tutor release downloaded from GitHub at image build: a plain semantic version (no 'v' prefix or range), or 'latest'. The default is the release this Feature pins, verified against its pinned SHA-256; any other version needs pluginSha256. 'latest' resolves to the newest release when the image is built (a prebuilt image keeps it until rebuilt) and is checked only against that release's own .sha256, which catches corruption but not a compromised release."
     },
     "pluginSha256": {

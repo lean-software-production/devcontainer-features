@@ -1,6 +1,14 @@
 name: "Release features"
 
+# Runs by itself after "Test features" passes on a push to main, so merging a
+# version bump releases it. devcontainers/action publishes only versions that
+# are not on ghcr.io yet, so a merge that bumps nothing publishes nothing.
+# workflow_dispatch stays for re-running a release or validating metadata.
 on:
+  workflow_run:
+    workflows: ["Test features"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       publish:
@@ -14,17 +22,34 @@ permissions:
   contents: write
   packages: write
 
+# One release at a time; a second waits rather than racing the first's tags.
+concurrency:
+  group: release-features
+  cancel-in-progress: false
+
 jobs:
   deploy:
+    # Automatic runs only for a successful test run of a push to main: never
+    # for a pull request's run, and never for a failed one.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
+    env:
+      # An automatic run always publishes; a manual one follows its input.
+      PUBLISH: ${{ github.event_name == 'workflow_run' || inputs.publish }}
     steps:
+      # Release exactly the commit that was tested, not whatever main is now.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Publish features to ghcr.io
         uses: devcontainers/action@v1
         with:
-          publish-features: ${{ inputs.publish }}
-          validate-only: ${{ !inputs.publish }}
+          publish-features: ${{ env.PUBLISH }}
+          validate-only: ${{ env.PUBLISH != 'true' }}
           base-path-to-features: "./src"
           generate-docs: "true"
         env:
@@ -32,9 +57,10 @@ jobs:
 
       # generate-docs only writes the README files into the workspace; the
       # action never commits them. Without this step they are discarded when
-      # the runner is torn down.
+      # the runner is torn down. If main has moved on since the tested commit
+      # the push is refused; the next release regenerates the same docs.
       - name: Commit generated documentation
-        if: ${{ inputs.publish }}
+        if: ${{ env.PUBLISH == 'true' }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -44,5 +70,6 @@ jobs:
             echo "Documentation is already up to date."
           else
             git commit -m "Update generated feature documentation [skip ci]"
-            git push origin HEAD:main
+            git push origin HEAD:main \
+              || echo "::warning::main moved on since the tested commit; the generated documentation will be committed by the next release."
           fi

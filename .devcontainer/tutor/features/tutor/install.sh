@@ -24,7 +24,7 @@ TUTOR_STARTER_REPO="${STARTERREPO-}"
 TUTOR_FACTORY="${FACTORY-}"
 TUTOR_SELECT_OUTLINE="${SELECTOUTLINE:-true}"
 TUTOR_DISABLE_PLUGINS="${DISABLEPLUGINS-automations,workflows,tasks,scheduled-send,github,browser-automation,agent-annotations,connect,plugin-api-docs,plugin-api-tester,theme-preview,keep-awake,account-pool,environment-modal-sandbox}"
-TUTOR_THEME="${THEME-plugin:tutor:paper}"
+TUTOR_THEME="${THEME-plugin:tutor:sketchbook}"
 TUTOR_PLUGIN_VERSION="${PLUGINVERSION-$TUTOR_PLUGIN_PINNED_VERSION}"
 TUTOR_PLUGIN_SHA256="${PLUGINSHA256-}"
 TUTOR_LIGHT_THEME="${LIGHTTHEME:-true}"
@@ -74,7 +74,7 @@ for tutor_plugin in ${TUTOR_DISABLE_PLUGINS//,/ }; do
 done
 if [ -n "$TUTOR_THEME" ]; then
     [[ "$TUTOR_THEME" =~ ^[A-Za-z0-9][A-Za-z0-9:._-]*$ ]] \
-        || fail "theme must be empty or a BB theme id such as 'plugin:tutor:paper' or 'nord'; received '$TUTOR_THEME'."
+        || fail "theme must be empty or a BB theme id such as 'plugin:tutor:sketchbook' or 'nord'; received '$TUTOR_THEME'."
 fi
 # courseRepo and starterRepo: <option name> <value>.
 check_repo_text() {

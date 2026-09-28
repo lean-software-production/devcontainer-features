@@ -16,6 +16,6 @@
 # with a message; pluginVersion plus pluginSha256 still work.
 # ============================================================================
 # shellcheck disable=SC2034 # read by install.sh and the tests
-TUTOR_PLUGIN_PINNED_VERSION=0.2.0
+TUTOR_PLUGIN_PINNED_VERSION=0.3.0
 # shellcheck disable=SC2034
-TUTOR_PLUGIN_PINNED_SHA256=69bb7bce38cd38c282e6615998f484adde431b6b363f87c9f9ddeb119c0537a6
+TUTOR_PLUGIN_PINNED_SHA256=81b1a5e126df6b4de3fb036a2b348f2bdb058e41de6a5dc3161f9ed7744fe82f

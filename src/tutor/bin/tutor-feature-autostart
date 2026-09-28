@@ -2,11 +2,12 @@
 # shellcheck source-path=SCRIPTDIR
 # postStartCommand, as the remote user, after bb-feature-autostart: wait for the
 # local BB, path-install the prebuilt plugin once, switch off the plugins a
-# student does not need, select the course outline and the Tutor theme, and
-# register the course and the student's repo (the starter, or with no starter
-# the factory, as before 0.6.0) as projects. Every step is idempotent, and
-# every choice a student can undo is made at most once per BB state directory,
-# so the hook is safe on every container start.
+# student does not need, select the course outline and the Tutor theme (once
+# switching a retired Paper theme to Sketchbook), and register the course and
+# the student's repo (the starter, or with no starter the factory, as before
+# 0.6.0) as projects. Every step is idempotent, and every choice a student can
+# undo is made at most once per BB state directory, so the hook is safe on every
+# container start.
 set -euo pipefail
 # shellcheck source=tutor-feature-common.sh
 . /usr/local/share/tutor/bin/tutor-feature-common.sh
@@ -241,6 +242,32 @@ select_theme() {
     : > "$marker"
 }
 
+# Switch an active Paper to Sketchbook once per BB state directory. Any other
+# theme is left alone, and so is a Paper a student picks again afterwards. Like
+# select_theme it waits for the plugin, which contributes both themes, and
+# leaves an empty theme option's promise intact. It runs before select_theme,
+# so a fresh state directory never counts a Paper it has just chosen.
+migrate_theme() {
+    local marker="$TUTOR_FEATURE_RUNTIME_DIR/theme-migrated" current
+    [ -n "$TUTOR_THEME" ] || return 0
+    [ ! -e "$marker" ] || return 0
+    case "${TUTOR_PLUGIN_STATUS:-}" in
+        running|degraded) ;;
+        *) tutor_log "the Tutor plugin is not running; not migrating the theme"; return 0 ;;
+    esac
+    current="$(tutor_bb theme show --json | tutor_json theme)" || { tutor_fail "cannot read BB's theme"; return 1; }
+    if [ "$current" = "$TUTOR_RETIRED_THEME" ]; then
+        if ! tutor_bb theme show "$TUTOR_RENAMED_THEME" --json >/dev/null 2>&1; then
+            tutor_log "theme '$TUTOR_RENAMED_THEME' is not available in BB; keeping '$current' for now"
+            return 0
+        fi
+        tutor_bb theme set "$TUTOR_RENAMED_THEME" --json >/dev/null \
+            || { tutor_fail "cannot switch the theme to '$TUTOR_RENAMED_THEME'"; return 1; }
+        tutor_log "switched the theme from '$current' to '$TUTOR_RENAMED_THEME'"
+    fi
+    : > "$marker"
+}
+
 status=0
 TUTOR_PLUGIN_STATUS=
 if install_plugin; then
@@ -249,6 +276,7 @@ else
     status=1
 fi
 disable_plugins || status=1
+migrate_theme || status=1
 select_theme || status=1
 register_project course "$TUTOR_COURSE" || status=1
 # The starter is the student's repo, and coach threads start there. A project

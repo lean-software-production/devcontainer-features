@@ -18,7 +18,7 @@ composes:
   release (`pluginVersion: "latest"`), resolved when the image is built, so a
   prebuild keeps that release until it is rebuilt; see the
   [tutor notes](../../src/tutor/NOTES.md#where-the-plugin-comes-from) for what
-  checks it then gets. On first start it selects the Tutor paper theme and switches off BB plugins a student
+  checks it then gets. On first start it selects the Tutor Sketchbook theme and switches off BB plugins a student
   does not need (Automations, Workflows, Connect and others; see its
   `disablePlugins` option); a student can turn any back on. The image
   pins BB to its light mode and shows the LSP icon in place of BB's (the

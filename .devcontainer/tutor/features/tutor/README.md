@@ -22,10 +22,10 @@ Adds the Tutor BB plugin (a checksummed bb-plugin-tutor release: the pinned one 
 | factory | Legacy, optional: absolute path of the student's factory, the folder holding spec/ and ITERATION, such as <starter>/tetris/.factory. It is written to config.json as a hint for the plugin, and is registered as the BB project only when 'starter' is empty (the behaviour before 0.6.0). New configurations set 'starter' and leave this empty. | string | - |
 | selectOutline | Select the Tutor course outline as BB's sidebar thread list once, unless another thread list was chosen already. | boolean | true |
 | disablePlugins | Comma-separated BB plugin ids to switch off once per BB state directory, so a student can turn any back on. Plugins that are not installed are skipped; tutor, thread-list, provider-* and the workspace environments are never switched off. Empty switches off nothing. | string | automations,workflows,tasks,scheduled-send,github,browser-automation,agent-annotations,connect,plugin-api-docs,plugin-api-tester,theme-preview,keep-awake,account-pool,environment-modal-sandbox |
-| theme | BB theme id to select once per BB state directory, only while BB's default theme is active. Empty leaves BB's theme alone. | string | plugin:tutor:paper |
+| theme | BB theme id to select once per BB state directory, only while BB's default theme is active. Empty leaves BB's theme alone. | string | plugin:tutor:sketchbook |
 | lightTheme | Pin BB's Settings > Appearance > Theme to Light: every page load resets it, so Dark or System lasts only until a reload. false leaves BB's choice to the learner. | boolean | true |
 | appIcons | Icons BB's web app shows in browser tabs, bookmarks and home screens: 'lsp' replaces every BB icon with the LSP one, 'bb' keeps BB's. | string | lsp |
-| pluginVersion | bb-plugin-tutor release downloaded from GitHub at image build: a plain semantic version (no 'v' prefix or range), or 'latest'. The default is the release this Feature pins, verified against its pinned SHA-256; any other version needs pluginSha256. 'latest' resolves to the newest release when the image is built (a prebuilt image keeps it until rebuilt) and is checked only against that release's own .sha256, which catches corruption but not a compromised release. | string | 0.2.0 |
+| pluginVersion | bb-plugin-tutor release downloaded from GitHub at image build: a plain semantic version (no 'v' prefix or range), or 'latest'. The default is the release this Feature pins, verified against its pinned SHA-256; any other version needs pluginSha256. 'latest' resolves to the newest release when the image is built (a prebuilt image keeps it until rebuilt) and is checked only against that release's own .sha256, which catches corruption but not a compromised release. | string | 0.3.0 |
 | pluginSha256 | SHA-256 (64 lower-case hex digits) of bb-plugin-tutor-<pluginVersion>.tgz. Required when pluginVersion is an explicit version other than the pinned default; with the default it must be empty or equal the pin; with 'latest' it must be empty. For an explicit version the release's own .sha256 file is never trusted. | string | - |
 
 ## What this Feature adds
@@ -93,14 +93,14 @@ anyone able to replace the tarball could replace that too.
 compute the tarball's SHA-256 yourself and set both options.
 
 ```sh
-v=0.2.0
+v=0.3.0
 curl -fsSLO "https://github.com/lean-software-production/bb-plugin-tutor/releases/download/v$v/bb-plugin-tutor-$v.tgz"
 sha256sum "bb-plugin-tutor-$v.tgz"
 ```
 
 ```jsonc
 "ghcr.io/lean-software-production/devcontainer-features/tutor:0": {
-  "pluginVersion": "0.2.0",
+  "pluginVersion": "0.3.0",
   "pluginSha256": "<the 64 hex digits sha256sum printed>"
 }
 ```
@@ -187,7 +187,7 @@ when the container starts, apart from the optional course and starter clones.
    home is unknown). The plugin writes the keep-alive's activity file beneath
    it.
 7. Validates `disablePlugins` (comma-separated ids of lower-case letters,
-   digits and `-`) and `theme` (a theme id such as `plugin:tutor:paper`), and
+   digits and `-`) and `theme` (a theme id such as `plugin:tutor:sketchbook`), and
    warns about any listed plugin Tutor needs. `lightTheme` must be `true` or
    `false` and `appIcons` `lsp` or `bb`.
 8. Patches BB's web client for `lightTheme` and `appIcons` (next section).
@@ -221,7 +221,7 @@ it only until the next reload. The marker comment makes the patch
 idempotent. The precompressed `index.html.br` and `index.html.gz` are
 deleted, because BB's server prefers them to `index.html`; it then serves the
 patched file uncompressed, with an ETag computed from its content. This is
-independent of `theme` (which BB palette, such as Tutor's paper, is
+independent of `theme` (which BB palette, such as Tutor's Sketchbook, is
 selected): `lightTheme` picks that palette's light variant. `false` leaves
 `index.html` untouched.
 
@@ -321,9 +321,16 @@ order, so it follows `bb-feature-autostart`. It:
   `workflows`, `account-pool`, `agent-annotations` and `plugin-api-*` start
   disabled; they are listed so that they stay off if BB installs or enables
   them by default later;
+- switches Tutor's old Paper theme (`plugin:tutor:paper`) to Sketchbook
+  (`plugin:tutor:sketchbook`), once per state directory (`theme-migrated`
+  marker). Plugin 0.3.0 renamed Paper and keeps it as an alias for one
+  release. Only an active Paper is switched: any other theme is left alone,
+  and so is a Paper a student picks again later. Like the theme choice below
+  it waits for the running plugin and for Sketchbook to be offered, and does
+  nothing when `theme` is empty;
 - selects `theme` with `bb theme set`, once per state directory
   (`theme-selected` marker), only when the Tutor plugin is running (it
-  contributes `plugin:tutor:paper`) and the active theme is BB's `default`,
+  contributes `plugin:tutor:sketchbook`) and the active theme is BB's `default`,
   so a student's own theme is never replaced. If BB does not offer the theme
   yet, the hook logs that and tries again on the next start.
 
@@ -406,7 +413,7 @@ CI runs:
     cloned, and the workspace is the BB project, named after its folder;
 - hermetic tests of the option validation and of every hook decision against
   a fake bb CLI, including the keep-alive's freshness window and single
-  instance;
+  instance, and the one-time switch from Paper to Sketchbook;
 - a hermetic test of the plugin download (`plugin-fetch-hermetic.sh`): a fake
   `curl` serves crafted tarballs, and a wrong checksum (which must extract
   nothing), a wrong top-level directory, `..`, absolute and escaping-link

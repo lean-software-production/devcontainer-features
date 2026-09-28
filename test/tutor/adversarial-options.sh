@@ -63,7 +63,7 @@ expect_reject 'shell injection in disablePlugins' 'disablePlugins must be' DISAB
 expect_reject 'upper case in disablePlugins' 'disablePlugins must be' DISABLEPLUGINS=Automations
 expect_reject 'empty item in disablePlugins' 'disablePlugins must be' DISABLEPLUGINS='automations,,workflows'
 expect_reject 'space in disablePlugins' 'disablePlugins must be' DISABLEPLUGINS='automations, workflows'
-expect_reject 'shell injection in theme' 'theme must be' THEME='plugin:tutor:paper;touch pwned'
+expect_reject 'shell injection in theme' 'theme must be' THEME='plugin:tutor:sketchbook;touch pwned'
 expect_reject 'space in theme' 'theme must be' THEME='my theme'
 sha="$(printf '%064d' 7)"
 # A release other than the one plugin-pin.sh pins, whatever that is.

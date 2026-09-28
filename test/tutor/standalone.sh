@@ -71,7 +71,7 @@ check "missing factory is not registered" bash -c 'test -z "$(project_id /home/n
 check "course outline is the sidebar thread list" bash -c 'test "$(outline)" = tutor/course-outline'
 check "plugins students do not need are switched off" bash -c 'for id in automations connect scheduled-send keep-awake; do test "$(plugin_enabled "$id")" = false || exit 1; done'
 check "Tutor, the thread list and the providers stay on" bash -c 'for id in tutor thread-list provider-claude-code provider-codex provider-pi; do test "$(plugin_enabled "$id")" = true || exit 1; done'
-check "the Tutor theme is selected" bash -c 'test "$(theme)" = plugin:tutor:paper'
+check "the Tutor theme is selected" bash -c 'test "$(theme)" = plugin:tutor:sketchbook'
 
 # Every start re-runs the hook: nothing is reinstalled or re-registered.
 check "autostart is idempotent" bash -c 'before=$(plugin_record tutor); out=$(tutor-feature-autostart 2>&1); test "$(plugin_record tutor)" = "$before" && grep -q "already installed" <<<"$out" && grep -q "already a BB project" <<<"$out"'
@@ -79,6 +79,7 @@ check "factory is registered once it exists" bash -c 'git init -q /home/node/my-
 check "a student's own thread list choice is kept" bash -c 'bb settings ui set sidebar.threadListProvider thread-list/thread-list >/dev/null && tutor-feature-autostart && test "$(outline)" = thread-list/thread-list'
 check "a plugin the student turns back on stays on" bash -c 'bb plugin enable automations >/dev/null && tutor-feature-autostart && test "$(plugin_enabled automations)" = true'
 check "a student's own theme is kept" bash -c 'bb theme reset >/dev/null && tutor-feature-autostart && test "$(theme)" = default'
+check "a Paper theme from before 0.7.0 is switched to Sketchbook once" bash -c 'bb theme set plugin:tutor:paper >/dev/null && rm "$state/.tutor-feature/theme-migrated" && tutor-feature-autostart && test "$(theme)" = plugin:tutor:sketchbook && bb theme set plugin:tutor:paper >/dev/null && tutor-feature-autostart && test "$(theme)" = plugin:tutor:paper'
 
 # End to end with the credential-free provider: a thread Tutor did not spawn is
 # neither offered Tutor's tools nor able to run them.

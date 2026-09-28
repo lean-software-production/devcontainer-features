@@ -91,7 +91,7 @@ let s = \"\"; process.stdin.on(\"data\", (d) => (s += d)).on(\"end\", () => {
   const off = plugins.filter((p) => (p.id === \"tutor\" || p.id === \"thread-list\" || p.id.startsWith(\"provider-\")) && p.enabled === false);
   if (on.length || off.length) { console.error(\"still on:\", on.map((p) => p.id), \"wrongly off:\", off.map((p) => p.id)); process.exit(1); }
 });"'
-check "the Tutor theme is selected" in_container bash -c 'bb theme show --json | grep -q "\"themeId\": \"plugin:tutor:paper\""'
+check "the Tutor theme is selected" in_container bash -c 'bb theme show --json | grep -q "\"themeId\": \"plugin:tutor:sketchbook\""'
 check "config.json is schema version 1 and tells the plugin where the activity file goes" in_container node -e 'const c = require("/usr/local/etc/tutor/config.json"); if (c.schemaVersion !== 1 || c.dataDir !== "/home/node/.bb-state") { console.error(c); process.exit(1); }'
 # Outside Codespaces the attach-time keep-alive returns at once, so it never
 # holds up devcontainer up (which has already run it as postAttachCommand).

@@ -18,6 +18,10 @@ TUTOR_FEATURE_OPTIONS="$TUTOR_FEATURE_SHARE/options.tsv"
     TUTOR_DEFAULT_THREAD_LIST=thread-list/thread-list
     TUTOR_OUTLINE_THREAD_LIST=tutor/course-outline
     TUTOR_DEFAULT_THEME=default
+    # Plugin 0.3.0 renamed Tutor's Paper theme to Sketchbook and keeps Paper as
+    # an alias for one release.
+    TUTOR_RETIRED_THEME=plugin:tutor:paper
+    TUTOR_RENAMED_THEME=plugin:tutor:sketchbook
     # One line: the ISO-8601 UTC time a student last used BB, written by the
     # plugin. Relative to the runtime directory.
     TUTOR_ACTIVITY_FILE=activity

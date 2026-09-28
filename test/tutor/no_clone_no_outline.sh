@@ -18,4 +18,8 @@ check "tutor plugin is running from the default state directory" bash -c 'bb plu
 check "missing course is not registered" bash -c 'test "$(bb project list --json | node -e "let s=\"\";process.stdin.on(\"data\",(d)=>(s+=d)).on(\"end\",()=>process.stdout.write(String(JSON.parse(s).length)))")" = 0'
 check "selectOutline false leaves the thread list alone" bash -c 'bb settings ui get sidebar.threadListProvider --json | grep -q "\"thread-list/thread-list\""'
 check "bootstrap is a clean no-op" bash -c 'out=$(tutor-feature-bootstrap 2>&1) && grep -q "courseRepo is empty" <<<"$out" && grep -q "starterRepo is empty" <<<"$out"'
+dist=/usr/local/share/bb/npm/lib/node_modules/bb-app/app/dist
+export dist
+check "lightTheme false leaves BB's boot script alone" bash -c '! grep -q "tutor-feature: lightTheme" "$dist/index.html" && test -s "$dist/index.html.br" && test -s "$dist/index.html.gz"'
+check "appIcons bb keeps BB's icons" bash -c '! cmp -s "$dist/favicon-32x32.png" "$dist/favicon-32x32-dark.png" && ! cmp -s "$dist/icon-512.png" "$dist/icon-512-teal.png"'
 reportResults

@@ -47,6 +47,13 @@ expect_reject 'option injection in starterRepo' 'starterRepo must be' STARTER=/w
 expect_reject 'shell metacharacter in starterRepo' 'starterRepo must be' STARTER=/workspaces/s STARTERREPO='https://github.com/x/y.git;touch pwned'
 expect_reject 'credentials in starterRepo' 'no credentials' STARTER=/workspaces/s STARTERREPO=https://user:secret@github.com/x/y.git
 expect_reject 'bad selectOutline' 'selectOutline must be' SELECTOUTLINE=yes
+expect_reject 'bad lightTheme' 'lightTheme must be' LIGHTTHEME=yes
+expect_reject 'upper-case lightTheme' 'lightTheme must be' LIGHTTHEME=TRUE
+expect_reject 'shell injection in lightTheme' 'lightTheme must be' LIGHTTHEME='true;touch pwned'
+expect_reject 'unknown appIcons' 'appIcons must be' APPICONS=tutor
+expect_reject 'upper-case appIcons' 'appIcons must be' APPICONS=LSP
+expect_reject 'empty appIcons' 'appIcons must be' APPICONS=
+expect_reject 'shell injection in appIcons' 'appIcons must be' APPICONS='lsp;touch pwned'
 expect_reject 'ssh courseRepo' 'courseRepo must be' COURSEREPO=git@github.com:lean-software-production/tutorial.git
 expect_reject 'plain http courseRepo' 'courseRepo must be' COURSEREPO=http://github.com/lean-software-production/tutorial.git
 expect_reject 'option injection in courseRepo' 'courseRepo must be' COURSEREPO='--upload-pack=touch pwned'
@@ -56,7 +63,7 @@ expect_reject 'shell injection in disablePlugins' 'disablePlugins must be' DISAB
 expect_reject 'upper case in disablePlugins' 'disablePlugins must be' DISABLEPLUGINS=Automations
 expect_reject 'empty item in disablePlugins' 'disablePlugins must be' DISABLEPLUGINS='automations,,workflows'
 expect_reject 'space in disablePlugins' 'disablePlugins must be' DISABLEPLUGINS='automations, workflows'
-expect_reject 'shell injection in theme' 'theme must be' THEME='plugin:tutor:paper;touch pwned'
+expect_reject 'shell injection in theme' 'theme must be' THEME='plugin:tutor:sketchbook;touch pwned'
 expect_reject 'space in theme' 'theme must be' THEME='my theme'
 sha="$(printf '%064d' 7)"
 # A release other than the one plugin-pin.sh pins, whatever that is.
@@ -98,6 +105,10 @@ expect_reject 'the starter layout without the bb Feature' 'the bb Feature must b
     FACTORY=/workspaces/capstone-project-starter/tetris/.factory
 expect_reject 'the starter as the project, with no factory, without the bb Feature' 'the bb Feature must be installed first' \
     STARTER=/workspaces/capstone-project-starter STARTERREPO= FACTORY=
+expect_reject 'lightTheme off and BB icons without the bb Feature' 'the bb Feature must be installed first' \
+    LIGHTTHEME=false APPICONS=bb
+expect_reject 'lightTheme on and LSP icons without the bb Feature' 'the bb Feature must be installed first' \
+    LIGHTTHEME=true APPICONS=lsp
 expect_reject 'plugin list and theme without the bb Feature' 'the bb Feature must be installed first' \
     DISABLEPLUGINS=automations,tutor,provider-codex THEME=nord
 expect_reject 'another plugin release without the bb Feature' 'the bb Feature must be installed first' \

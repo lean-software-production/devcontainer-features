@@ -59,6 +59,9 @@ jobs:
       - name: Test the Tutor plugin download checks
         run: bash test/tutor/plugin-fetch-hermetic.sh
 
+      - name: Test the Tutor patches to BB's web client
+        run: bash test/tutor/bb-brand-hermetic.sh
+
       - name: Test Tutor lifecycle hooks
         run: sudo bash test/tutor/lifecycle-hermetic.sh
 

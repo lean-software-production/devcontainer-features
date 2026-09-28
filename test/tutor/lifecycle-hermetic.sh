@@ -59,11 +59,15 @@ bb_options() {
         SERVER_PORT 48886 HOST_DAEMON_PORT 48887 DATA_DIR "$state" APP_URL auto BB_APP_BIN "$bb_share/npm/bin/bb-app"
 }
 default_disable=automations,workflows,tasks,github
+# The theme option's default, as devcontainer-feature.json and install.sh give it.
+default_theme="$(node -p 'require(process.argv[1]).options.theme.default' "$repo_root/src/tutor/devcontainer-feature.json")"
+paper=plugin:tutor:paper
+sketchbook=plugin:tutor:sketchbook
 # The starter is never cloned unless a check passes a starterRepo (the fifth argument).
 tutor_options() {
     set_options "$tutor_share/options.tsv" COURSE "$course" COURSE_REPO "${1-https://example.invalid/course.git}" \
         STARTER "$starter" STARTER_REPO "${5-}" \
-        FACTORY "$factory" SELECT_OUTLINE "${2:-true}" DISABLE_PLUGINS "${3-$default_disable}" THEME "${4-plugin:tutor:paper}"
+        FACTORY "$factory" SELECT_OUTLINE "${2:-true}" DISABLE_PLUGINS "${3-$default_disable}" THEME "${4-$default_theme}"
 }
 
 printf '#!/bin/sh\nexit 0\n' > "$bb_share/npm/bin/bb-app"
@@ -141,7 +145,7 @@ chmod 755 "$fake/bin/git"
 # The 0.5.0 layout: no starter, so the factory is the BB project.
 legacy_options() {
     set_options "$tutor_share/options.tsv" COURSE "$course" COURSE_REPO https://example.invalid/course.git \
-        STARTER "" STARTER_REPO "" FACTORY "${1:-$factory}" SELECT_OUTLINE true DISABLE_PLUGINS "$default_disable" THEME plugin:tutor:paper
+        STARTER "" STARTER_REPO "" FACTORY "${1:-$factory}" SELECT_OUTLINE true DISABLE_PLUGINS "$default_disable" THEME "$default_theme"
 }
 # The 0.6.0 layout: the starter is the student's repo and the BB project; the
 # factory, if set, lives inside it.
@@ -157,8 +161,9 @@ reset_world() {
     printf '%s\n' "automations running" "workflows disabled" "github running" "thread-list running" \
         "provider-codex running" "environment-git-worktree running" "keep-awake running" > "$fake/plugins"
     printf 'default' > "$fake/theme"
-    # The Tutor plugin contributes its theme once it runs; model that as always available.
-    printf '%s\n' default nord plugin:tutor:paper > "$fake/themes"
+    # The Tutor plugin contributes its themes once it runs; model that as always
+    # available. Plugin 0.3.0 keeps Paper as an alias of Sketchbook for a release.
+    printf '%s\n' default nord "$sketchbook" "$paper" > "$fake/themes"
     bb_options; tutor_options
 }
 run_hook() {
@@ -394,10 +399,12 @@ expect "a malformed saved plugin id is refused" out_has "invalid saved disablePl
 expect "nothing is disabled with malformed options" test "$(plugin_status automations)" = running
 
 # --- the Tutor theme ----------------------------------------------------------
+expect "the theme option defaults to Sketchbook" test "$default_theme" = "$sketchbook"
+expect "install.sh has the same theme default" grep -qF "\${THEME-$default_theme}" "$repo_root/src/tutor/install.sh"
 reset_world
 run_hook tutor-feature-autostart
-expect "the Tutor theme is selected over BB's default" test "$(cat "$fake/theme")" = plugin:tutor:paper
-expect "the theme choice is logged" out_has "selected the theme 'plugin:tutor:paper'"
+expect "the Tutor theme is selected over BB's default" test "$(cat "$fake/theme")" = "$sketchbook"
+expect "the theme choice is logged" out_has "selected the theme '$sketchbook'"
 
 printf 'default' > "$fake/theme"; : > "$fake/calls.log"
 run_hook tutor-feature-autostart
@@ -422,11 +429,11 @@ reset_world
 printf '%s\n' default nord > "$fake/themes"
 run_hook tutor-feature-autostart
 expect "an unavailable theme does not fail the hook" test "$rc" = 0
-expect "an unavailable theme is logged" out_has "theme 'plugin:tutor:paper' is not available"
+expect "an unavailable theme is logged" out_has "theme '$default_theme' is not available"
 expect "an unavailable theme leaves BB's theme" test "$(cat "$fake/theme")" = default
-printf '%s\n' default nord plugin:tutor:paper > "$fake/themes"
+printf '%s\n' default nord "$sketchbook" "$paper" > "$fake/themes"
 run_hook tutor-feature-autostart
-expect "the theme is selected once it becomes available" test "$(cat "$fake/theme")" = plugin:tutor:paper
+expect "the theme is selected once it becomes available" test "$(cat "$fake/theme")" = "$sketchbook"
 
 reset_world
 touch "$fake/install-fails"
@@ -443,6 +450,62 @@ reset_world
 tutor_options https://example.invalid/course.git true "$default_disable" 'x;y'
 run_hook tutor-feature-autostart
 expect "a malformed saved theme is refused" out_has "invalid saved theme"
+
+# --- Paper becomes Sketchbook ---------------------------------------------------
+# A state directory from before 0.7.0: its theme was chosen, but never migrated.
+pre_sketchbook_state() {
+    reset_world
+    run_hook tutor-feature-autostart
+    rm -f "$state/.tutor-feature/theme-migrated"
+    printf '%s' "${1:-$paper}" > "$fake/theme"
+    : > "$fake/calls.log"
+}
+pre_sketchbook_state
+run_hook tutor-feature-autostart
+expect "an active Paper is switched to Sketchbook" test "$(cat "$fake/theme")" = "$sketchbook"
+expect "the switch is logged" out_has "switched the theme from '$paper' to '$sketchbook'"
+expect "the migration is recorded" test -e "$state/.tutor-feature/theme-migrated"
+printf '%s' "$paper" > "$fake/theme"; : > "$fake/calls.log"
+run_hook tutor-feature-autostart
+expect "Paper chosen again after the migration is kept" test "$(cat "$fake/theme")" = "$paper"
+expect "no theme call after the migration" calls_lack "theme"
+
+pre_sketchbook_state nord
+run_hook tutor-feature-autostart
+expect "a student's own theme is not migrated" test "$(cat "$fake/theme")" = nord
+expect "a kept theme still counts as the migration" test -e "$state/.tutor-feature/theme-migrated"
+printf '%s' "$paper" > "$fake/theme"
+run_hook tutor-feature-autostart
+expect "Paper chosen after a kept theme is not migrated" test "$(cat "$fake/theme")" = "$paper"
+
+pre_sketchbook_state default
+run_hook tutor-feature-autostart
+expect "BB's default theme chosen again is not migrated" test "$(cat "$fake/theme")" = default
+
+pre_sketchbook_state
+echo disabled > "$fake/plugin-status"
+run_hook tutor-feature-autostart
+expect "Paper is not migrated while the plugin is off" test "$(cat "$fake/theme")" = "$paper"
+expect "no migration is recorded while the plugin is off" test ! -e "$state/.tutor-feature/theme-migrated"
+echo running > "$fake/plugin-status"
+run_hook tutor-feature-autostart
+expect "Paper is migrated once the plugin runs" test "$(cat "$fake/theme")" = "$sketchbook"
+
+pre_sketchbook_state
+printf '%s\n' default nord "$paper" > "$fake/themes"
+run_hook tutor-feature-autostart
+expect "a missing Sketchbook does not fail the hook" test "$rc" = 0
+expect "Paper is kept while Sketchbook is not offered" test "$(cat "$fake/theme")" = "$paper"
+expect "a missing Sketchbook is logged" out_has "theme '$sketchbook' is not available"
+expect "no migration is recorded without Sketchbook" test ! -e "$state/.tutor-feature/theme-migrated"
+printf '%s\n' default nord "$sketchbook" "$paper" > "$fake/themes"
+run_hook tutor-feature-autostart
+expect "Paper is migrated once Sketchbook is offered" test "$(cat "$fake/theme")" = "$sketchbook"
+
+pre_sketchbook_state
+tutor_options https://example.invalid/course.git true "$default_disable" ""
+run_hook tutor-feature-autostart
+expect "an empty theme option never migrates the theme" calls_lack "theme"
 
 reset_world
 set_options "$tutor_share/options.tsv" COURSE "$course" COURSE_REPO "" STARTER "starter" STARTER_REPO "" \
@@ -549,20 +612,20 @@ expect "no clone is attempted into an unwritable parent" test ! -e "$fake/git.lo
 # The starter is cloned like the course, and independently of it.
 reset_world
 mkdir -p "$course"
-tutor_options https://example.invalid/course.git true "$default_disable" plugin:tutor:paper https://example.invalid/starter.git
+tutor_options https://example.invalid/course.git true "$default_disable" "$default_theme" https://example.invalid/starter.git
 run_hook tutor-feature-bootstrap
 expect "bootstrap clones a missing starter" test "$rc" = 0
 expect "the starter clone never takes options from the URL" test "$(cat "$fake/git.log")" = "clone --quiet -- https://example.invalid/starter.git $starter"
 
 reset_world
-tutor_options https://example.invalid/course.git true "$default_disable" plugin:tutor:paper https://example.invalid/starter.git
+tutor_options https://example.invalid/course.git true "$default_disable" "$default_theme" https://example.invalid/starter.git
 run_hook tutor-feature-bootstrap
 expect "a missing course and starter are both cloned" \
     test "$(cat "$fake/git.log")" = "clone --quiet -- https://example.invalid/course.git $course"$'\n'"clone --quiet -- https://example.invalid/starter.git $starter"
 
 reset_world
 mkdir -p "$course" "$starter"
-tutor_options https://example.invalid/course.git true "$default_disable" plugin:tutor:paper https://example.invalid/starter.git
+tutor_options https://example.invalid/course.git true "$default_disable" "$default_theme" https://example.invalid/starter.git
 run_hook tutor-feature-bootstrap
 expect "an existing starter is not cloned over" test ! -e "$fake/git.log"
 expect "an existing starter is logged" out_has "starter found at $starter"
@@ -574,14 +637,14 @@ expect "empty starterRepo never clones" test ! -e "$fake/git.log"
 
 reset_world
 mkdir -p "$course"
-tutor_options https://example.invalid/course.git true "$default_disable" plugin:tutor:paper https://example.invalid/starter.git
+tutor_options https://example.invalid/course.git true "$default_disable" "$default_theme" https://example.invalid/starter.git
 touch "$fake/git-fails"
 run_hook tutor-feature-bootstrap
 expect "a failed starter clone does not fail the hook" test "$rc" = 0
 expect "a failed starter clone says how to recover" out_has "clone it yourself with: git clone https://example.invalid/starter.git $starter"
 
 reset_world
-tutor_options https://example.invalid/course.git true "$default_disable" plugin:tutor:paper https://example.invalid/starter.git
+tutor_options https://example.invalid/course.git true "$default_disable" "$default_theme" https://example.invalid/starter.git
 touch "$fake/git-fails"
 run_hook tutor-feature-bootstrap
 expect "a failed course clone still tries the starter" grep -qxF "clone --quiet -- https://example.invalid/starter.git $starter" "$fake/git.log"

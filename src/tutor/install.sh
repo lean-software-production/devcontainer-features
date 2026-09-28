@@ -14,6 +14,8 @@ FEATURE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$FEATURE_DIR/plugin-pin.sh"
 # shellcheck source=bin/tutor-plugin-fetch.sh
 . "$FEATURE_DIR/bin/tutor-plugin-fetch.sh"
+# shellcheck source=bin/tutor-bb-brand.sh
+. "$FEATURE_DIR/bin/tutor-bb-brand.sh"
 
 TUTOR_COURSE="${COURSE-/workspaces/tutorial}"
 TUTOR_COURSE_REPO="${COURSEREPO-https://github.com/lean-software-production/tutorial.git}"
@@ -22,9 +24,11 @@ TUTOR_STARTER_REPO="${STARTERREPO-}"
 TUTOR_FACTORY="${FACTORY-}"
 TUTOR_SELECT_OUTLINE="${SELECTOUTLINE:-true}"
 TUTOR_DISABLE_PLUGINS="${DISABLEPLUGINS-automations,workflows,tasks,scheduled-send,github,browser-automation,agent-annotations,connect,plugin-api-docs,plugin-api-tester,theme-preview,keep-awake,account-pool,environment-modal-sandbox}"
-TUTOR_THEME="${THEME-plugin:tutor:paper}"
+TUTOR_THEME="${THEME-plugin:tutor:sketchbook}"
 TUTOR_PLUGIN_VERSION="${PLUGINVERSION-$TUTOR_PLUGIN_PINNED_VERSION}"
 TUTOR_PLUGIN_SHA256="${PLUGINSHA256-}"
+TUTOR_LIGHT_THEME="${LIGHTTHEME:-true}"
+TUTOR_APP_ICONS="${APPICONS-lsp}"
 
 SHARE_DIR=/usr/local/share/tutor
 PLUGIN_DIR="$SHARE_DIR/plugin"
@@ -55,6 +59,8 @@ valid_path "$TUTOR_COURSE" || fail "course must be an absolute path without dot 
 [ -z "$TUTOR_FACTORY" ] || valid_path "$TUTOR_FACTORY" || fail "factory must be empty or an absolute path without dot segments, control characters, quotes or shell metacharacters; received '$TUTOR_FACTORY'."
 [ -z "$TUTOR_FACTORY" ] || [ "$TUTOR_FACTORY" != "$TUTOR_COURSE" ] || fail "factory and course must be different directories."
 case "$TUTOR_SELECT_OUTLINE" in true|false) ;; *) fail "selectOutline must be true or false; received '$TUTOR_SELECT_OUTLINE'." ;; esac
+case "$TUTOR_LIGHT_THEME" in true|false) ;; *) fail "lightTheme must be true or false; received '$TUTOR_LIGHT_THEME'." ;; esac
+case "$TUTOR_APP_ICONS" in lsp|bb) ;; *) fail "appIcons must be 'lsp' or 'bb'; received '$TUTOR_APP_ICONS'." ;; esac
 # The same rules as the start-up hook's tutor_plugin_list and tutor_theme_id.
 if [ -n "$TUTOR_DISABLE_PLUGINS" ]; then
     [[ "$TUTOR_DISABLE_PLUGINS" =~ ^[a-z0-9][a-z0-9-]*(,[a-z0-9][a-z0-9-]*)*$ ]] \
@@ -68,7 +74,7 @@ for tutor_plugin in ${TUTOR_DISABLE_PLUGINS//,/ }; do
 done
 if [ -n "$TUTOR_THEME" ]; then
     [[ "$TUTOR_THEME" =~ ^[A-Za-z0-9][A-Za-z0-9:._-]*$ ]] \
-        || fail "theme must be empty or a BB theme id such as 'plugin:tutor:paper' or 'nord'; received '$TUTOR_THEME'."
+        || fail "theme must be empty or a BB theme id such as 'plugin:tutor:sketchbook' or 'nord'; received '$TUTOR_THEME'."
 fi
 # courseRepo and starterRepo: <option name> <value>.
 check_repo_text() {
@@ -217,6 +223,11 @@ install -m 0644 "$FEATURE_DIR/bin/tutor-feature-common.sh" "$SHARE_DIR/bin/tutor
 ln -sfn "$SHARE_DIR/bin/tutor-feature-bootstrap" /usr/local/bin/tutor-feature-bootstrap
 ln -sfn "$SHARE_DIR/bin/tutor-feature-autostart" /usr/local/bin/tutor-feature-autostart
 ln -sfn "$SHARE_DIR/bin/tutor-keepalive" /usr/local/bin/tutor-keepalive
+
+# BB's web client: pin the Appearance theme to Light and swap BB's icons for
+# the LSP ones. Best effort: it warns, and never fails the build.
+TUTOR_BB_NPM_PREFIX="$BB_SHARE/npm" tutor_bb_brand "$TUTOR_LIGHT_THEME" "$TUTOR_APP_ICONS" "$FEATURE_DIR/icons" \
+    || tutor_bb_warn "patching BB's web client failed; see the messages above."
 
 plugin_version="$(node -e 'process.stdout.write(require(process.argv[1]).version)' "$PLUGIN_DIR/package.json")"
 echo "Installed the Tutor plugin ${plugin_version} (sha256 ${tutor_plugin_sha256}, ${tutor_plugin_checked}) in ${PLUGIN_DIR}; it is path-installed into BB when the container starts."

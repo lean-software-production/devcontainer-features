@@ -47,11 +47,19 @@ check "a factory-only config has no repo" bash -c 'node -e "const c=require(\"/u
 check "plugin config is schema version 1" bash -c 'node -e "const c=require(\"/usr/local/etc/tutor/config.json\"); process.exit(c.schemaVersion===1 ? 0 : 1)"'
 check "plugin config names the BB state directory" bash -c 'node -e "const c=require(\"/usr/local/etc/tutor/config.json\"); process.exit(c.dataDir===process.argv[1] ? 0 : 1)" "$state"'
 check "config and options are root-owned and not writable by others" bash -c 'for f in /usr/local/etc/tutor/config.json /usr/local/share/tutor/options.tsv /usr/local/share/tutor/plugin.sha256; do test "$(stat -c %u "$f")" = 0 && test $((8#$(stat -c %a "$f") & 022)) = 0 || exit 1; done'
+# Image build: BB's web client is pinned to Light and wears the LSP icons.
+dist=/usr/local/share/bb/npm/lib/node_modules/bb-app/app/dist
+export dist
+check "BB's theme is pinned to Light in its boot script" bash -c 'grep -qF "/* tutor-feature: lightTheme */ try { localStorage.setItem(\"bb.theme\", \"light\"); } catch {}" "$dist/index.html" && test ! -e "$dist/index.html.br" && test ! -e "$dist/index.html.gz"'
+check "BB's icons are the LSP ones, one per kind and size" bash -c 'cmp "$dist/favicon-32x32.png" "$dist/favicon-32x32-dark.png" && cmp "$dist/icon-512.png" "$dist/icon-512-teal.png" && cmp "$dist/icon-192-maskable.png" "$dist/icon-192-maskable-blue.png" && ! cmp -s "$dist/icon-512.png" "$dist/icon-512-maskable.png"'
 check "lifecycle helpers are installed" bash -c 'command -v tutor-feature-bootstrap && command -v tutor-feature-autostart && command -v tutor-keepalive'
 check "keep-alive returns at once outside a Codespace" bash -c 'timeout 10 tutor-keepalive | grep -q "only runs in a GitHub Codespace"'
 
 # postCreate: the course was cloned.
 check "course was cloned at post-create" bash -c 'git -C /home/node/course rev-parse --verify HEAD && test -f /home/node/course/docs/iterations/README.md'
+
+# postStart: BB, started by the bb Feature, serves the patched boot script.
+check "BB serves the patched index.html" bash -c 'node -e "fetch(process.argv[1]).then((r)=>r.text()).then((t)=>process.exit(t.includes(\"tutor-feature: lightTheme\")?0:1),()=>process.exit(1))" "$BB_SERVER_URL/"'
 
 # postStart: the plugin is path-installed from a user-owned copy of this build.
 check "tutor plugin is running" bash -c 'test "$(plugin_record tutor | cut -f2)" = running'
@@ -63,7 +71,7 @@ check "missing factory is not registered" bash -c 'test -z "$(project_id /home/n
 check "course outline is the sidebar thread list" bash -c 'test "$(outline)" = tutor/course-outline'
 check "plugins students do not need are switched off" bash -c 'for id in automations connect scheduled-send keep-awake; do test "$(plugin_enabled "$id")" = false || exit 1; done'
 check "Tutor, the thread list and the providers stay on" bash -c 'for id in tutor thread-list provider-claude-code provider-codex provider-pi; do test "$(plugin_enabled "$id")" = true || exit 1; done'
-check "the Tutor theme is selected" bash -c 'test "$(theme)" = plugin:tutor:paper'
+check "the Tutor theme is selected" bash -c 'test "$(theme)" = plugin:tutor:sketchbook'
 
 # Every start re-runs the hook: nothing is reinstalled or re-registered.
 check "autostart is idempotent" bash -c 'before=$(plugin_record tutor); out=$(tutor-feature-autostart 2>&1); test "$(plugin_record tutor)" = "$before" && grep -q "already installed" <<<"$out" && grep -q "already a BB project" <<<"$out"'
@@ -71,6 +79,7 @@ check "factory is registered once it exists" bash -c 'git init -q /home/node/my-
 check "a student's own thread list choice is kept" bash -c 'bb settings ui set sidebar.threadListProvider thread-list/thread-list >/dev/null && tutor-feature-autostart && test "$(outline)" = thread-list/thread-list'
 check "a plugin the student turns back on stays on" bash -c 'bb plugin enable automations >/dev/null && tutor-feature-autostart && test "$(plugin_enabled automations)" = true'
 check "a student's own theme is kept" bash -c 'bb theme reset >/dev/null && tutor-feature-autostart && test "$(theme)" = default'
+check "a Paper theme from before 0.7.0 is switched to Sketchbook once" bash -c 'bb theme set plugin:tutor:paper >/dev/null && rm "$state/.tutor-feature/theme-migrated" && tutor-feature-autostart && test "$(theme)" = plugin:tutor:sketchbook && bb theme set plugin:tutor:paper >/dev/null && tutor-feature-autostart && test "$(theme)" = plugin:tutor:paper'
 
 # End to end with the credential-free provider: a thread Tutor did not spawn is
 # neither offered Tutor's tools nor able to run them.

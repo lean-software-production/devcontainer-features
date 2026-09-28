@@ -1,0 +1,179 @@
+<!doctype html>
+<!--
+  Source of the tutor Feature's "LSP" app icons (src/tutor/icons/*.png).
+  render.mjs opens this page in headless Chromium and calls drawIcon(kind, size)
+  once per PNG, so every size is drawn directly at its own pixel size rather
+  than downscaled from 512. Open it in a browser to preview every icon.
+
+  Design: a slightly wobbly rounded tile in brand coral with a thick ink
+  outline, and "LSP" in Luckiest Guy, paper fill over an ink stroke.
+
+  fonts/luckiest-guy-latin-400-normal.woff2 is copied unchanged from
+  @fontsource/luckiest-guy@5.3.0 (sha256 3877b522181765adf66ba89bd68d288e
+  cb9f2483b441baab3424646b0c7aaa0a). Luckiest Guy is Copyright (c) 2010 by
+  Brian J. Bonislawsky DBA Astigmatic (AOETI), under the Apache License 2.0:
+  fonts/LICENSE-luckiest-guy.txt.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LSP icons</title>
+<style>
+  body { margin: 0; padding: 16px; font: 12px sans-serif; background: #eee; }
+  figure { display: inline-block; margin: 8px; text-align: center; vertical-align: bottom; }
+  figure canvas { display: block; margin: 0 auto 4px; }
+</style>
+</head>
+<body>
+<script>
+const CORAL = "#F76C37";
+const INK = "#2A2724";
+const PAPER = "#FCF9F3";
+const WHITE = "#FFFFFF";
+const FONT = "LSP Luckiest Guy";
+
+// The hand-drawn tile, in a 512 x 512 box (drawn with a 20-unit ink outline).
+const WOBBLY_TILE = "M28 56 Q26 26 58 28 L452 22 Q486 24 484 58 L490 452 Q488 488 452 486 L58 490 Q24 488 26 454 Z";
+
+// Per-size tuning. Lengths are device pixels at that size.
+//   border     ink outline width of the tile (0: no outline)
+//   wobble     draw the hand-drawn tile path (else a pixel-aligned rounded square)
+//   radius     corner radius of the rounded square (wobble: false only)
+//   inset      distance from the image edge to the outer edge of the outline
+//   width      ink width of the letters, as a fraction of the image
+//   stroke     ink stroke around the letters (half of it shows, behind the fill)
+//   dy         vertical nudge of the letters, as a fraction of the image
+//   stretch    vertical scale of the letters (taller letters for tiny sizes)
+//   snap       align the letters' ink box to whole pixels
+const TUNING = {
+  tile: {
+    // Tab-bar sizes: a crisp pixel-aligned square instead of the wobble, a
+    // thin outline, and wider, taller letters with a lighter stroke so that
+    // "LSP" stays readable at 16 px.
+    16: { border: 1, wobble: false, radius: 3, inset: 0, width: 0.84, stroke: 1, stretch: 1.4, snap: true },
+    32: { border: 2, wobble: false, radius: 6, inset: 0, width: 0.8, stroke: 2.2, stretch: 1.2, snap: true },
+    192: { border: 8, wobble: true, width: 0.62, stroke: 4, dy: -0.01 },
+    512: { border: 20, wobble: true, width: 0.6, stroke: 9, dy: -0.015 },
+  },
+  // apple-touch-icon: opaque, full-bleed (iOS rounds the corners itself).
+  touch: {
+    180: { width: 0.66, stroke: 5, dy: -0.01 },
+  },
+  // Web app manifest "maskable": full-bleed, letters inside the central
+  // safe zone (a circle of 40% of the size in radius).
+  maskable: {
+    192: { width: 0.6, stroke: 4, dy: 0 },
+    512: { width: 0.6, stroke: 10, dy: 0 },
+  },
+  // Web app manifest "monochrome": only the alpha channel counts. Like BB's
+  // own, a white glyph on transparency, inside the maskable safe zone.
+  monochrome: {
+    192: { width: 0.62, dy: 0 },
+    512: { width: 0.62, dy: 0 },
+  },
+};
+
+const fontReady = (async () => {
+  const face = new FontFace(FONT, "url(fonts/luckiest-guy-latin-400-normal.woff2)");
+  document.fonts.add(await face.load());
+})();
+
+function roundedSquare(ctx, x, y, side, r) {
+  ctx.beginPath();
+  ctx.roundRect(x, y, side, side, r);
+}
+
+// Draws "LSP" with its ink box centred at (cx, cy) and `width` pixels wide.
+function letters(ctx, size, t, fill, stroke) {
+  const probe = 100;
+  ctx.font = `${probe}px "${FONT}"`;
+  const m = ctx.measureText("LSP");
+  const inkW = m.actualBoundingBoxLeft + m.actualBoundingBoxRight;
+  const px = (probe * t.width * size) / inkW;
+  ctx.font = `${px}px "${FONT}"`;
+  const k = ctx.measureText("LSP");
+  const w = k.actualBoundingBoxLeft + k.actualBoundingBoxRight;
+  const sy = t.stretch || 1;
+  const h = (k.actualBoundingBoxAscent + k.actualBoundingBoxDescent) * sy;
+  let left = (size - w) / 2;
+  let top = (size - h) / 2 + (t.dy || 0) * size;
+  if (t.snap) { left = Math.round(left); top = Math.round(top); }
+  const x = left + k.actualBoundingBoxLeft;
+  const y = top + k.actualBoundingBoxAscent * sy;
+  ctx.save();
+  ctx.translate(0, y);
+  ctx.scale(1, sy);
+  ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "left";
+  if (stroke && t.stroke) {
+    ctx.lineJoin = "round";
+    ctx.lineWidth = t.stroke;
+    ctx.strokeStyle = stroke;
+    ctx.strokeText("LSP", x, 0);
+  }
+  ctx.fillStyle = fill;
+  ctx.fillText("LSP", x, 0);
+  ctx.restore();
+}
+
+async function drawIcon(kind, size) {
+  await fontReady;
+  const t = TUNING[kind]?.[size];
+  if (!t) throw new Error(`no tuning for ${kind} at ${size}px`);
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (kind === "tile") {
+    if (t.wobble) {
+      ctx.save();
+      const s = size / 512;
+      ctx.scale(s, s);
+      const path = new Path2D(WOBBLY_TILE);
+      ctx.fillStyle = CORAL;
+      ctx.fill(path);
+      ctx.lineWidth = t.border / s;
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = INK;
+      ctx.stroke(path);
+      ctx.restore();
+    } else {
+      // Outline fully inside the image, on whole pixels.
+      const half = t.border / 2;
+      roundedSquare(ctx, t.inset + half, t.inset + half, size - 2 * t.inset - t.border, t.radius);
+      ctx.fillStyle = CORAL;
+      ctx.fill();
+      ctx.lineWidth = t.border;
+      ctx.strokeStyle = INK;
+      ctx.stroke();
+    }
+    letters(ctx, size, t, PAPER, INK);
+  } else if (kind === "touch" || kind === "maskable") {
+    ctx.fillStyle = CORAL;
+    ctx.fillRect(0, 0, size, size);
+    letters(ctx, size, t, PAPER, INK);
+  } else if (kind === "monochrome") {
+    letters(ctx, size, t, WHITE, null);
+  }
+  return canvas;
+}
+
+// Every icon the Feature ships: [kind, size].
+const ICONS = Object.entries(TUNING).flatMap(([kind, sizes]) => Object.keys(sizes).map((s) => [kind, Number(s)]));
+
+async function pngDataUrl(kind, size) {
+  return (await drawIcon(kind, size)).toDataURL("image/png");
+}
+
+// Opened directly: preview every icon at its own size.
+if (!navigator.webdriver) {
+  (async () => {
+    for (const [kind, size] of ICONS) {
+      const fig = document.createElement("figure");
+      fig.append(await drawIcon(kind, size), `${kind} ${size}`);
+      document.body.append(fig);
+    }
+  })();
+}
+</script>
+</body>
+</html>

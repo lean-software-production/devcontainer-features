@@ -1,6 +1,6 @@
 {
   "id": "tutor",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "name": "Tutor coached course for BB",
   "description": "Adds the Tutor BB plugin (a checksummed bb-plugin-tutor release: the pinned one by default, or the newest with pluginVersion 'latest') to the bb Feature's standalone server: a course outline in the sidebar and a coach thread per lesson that works one Gherkin Rule at a time. Requires the bb Feature in standalone mode.",
   "documentationURL": "https://github.com/lean-software-production/devcontainer-features/tree/main/src/tutor",
@@ -48,14 +48,25 @@
     },
     "theme": {
       "type": "string",
-      "proposals": ["plugin:tutor:paper", ""],
-      "default": "plugin:tutor:paper",
+      "proposals": ["plugin:tutor:sketchbook", ""],
+      "default": "plugin:tutor:sketchbook",
       "description": "BB theme id to select once per BB state directory, only while BB's default theme is active. Empty leaves BB's theme alone."
+    },
+    "lightTheme": {
+      "type": "boolean",
+      "default": true,
+      "description": "Pin BB's Settings > Appearance > Theme to Light: every page load resets it, so Dark or System lasts only until a reload. false leaves BB's choice to the learner."
+    },
+    "appIcons": {
+      "type": "string",
+      "enum": ["lsp", "bb"],
+      "default": "lsp",
+      "description": "Icons BB's web app shows in browser tabs, bookmarks and home screens: 'lsp' replaces every BB icon with the LSP one, 'bb' keeps BB's."
     },
     "pluginVersion": {
       "type": "string",
-      "proposals": ["0.2.0", "latest"],
-      "default": "0.2.0",
+      "proposals": ["0.3.0", "latest"],
+      "default": "0.3.0",
       "description": "bb-plugin-tutor release downloaded from GitHub at image build: a plain semantic version (no 'v' prefix or range), or 'latest'. The default is the release this Feature pins, verified against its pinned SHA-256; any other version needs pluginSha256. 'latest' resolves to the newest release when the image is built (a prebuilt image keeps it until rebuilt) and is checked only against that release's own .sha256, which catches corruption but not a compromised release."
     },
     "pluginSha256": {

@@ -38,7 +38,9 @@
         "starterRepo": "",
         "selectOutline": false,
         "disablePlugins": "",
-        "theme": ""
+        "theme": "",
+        "lightTheme": false,
+        "appIcons": "bb"
       }
     },
     "overrideFeatureInstallOrder": ["./bb", "./tutor"]

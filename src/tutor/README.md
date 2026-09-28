@@ -23,6 +23,8 @@ Adds the Tutor BB plugin (a checksummed bb-plugin-tutor release: the pinned one 
 | selectOutline | Select the Tutor course outline as BB's sidebar thread list once, unless another thread list was chosen already. | boolean | true |
 | disablePlugins | Comma-separated BB plugin ids to switch off once per BB state directory, so a student can turn any back on. Plugins that are not installed are skipped; tutor, thread-list, provider-* and the workspace environments are never switched off. Empty switches off nothing. | string | automations,workflows,tasks,scheduled-send,github,browser-automation,agent-annotations,connect,plugin-api-docs,plugin-api-tester,theme-preview,keep-awake,account-pool,environment-modal-sandbox |
 | theme | BB theme id to select once per BB state directory, only while BB's default theme is active. Empty leaves BB's theme alone. | string | plugin:tutor:paper |
+| lightTheme | Pin BB's Settings > Appearance > Theme to Light: every page load resets it, so Dark or System lasts only until a reload. false leaves BB's choice to the learner. | boolean | true |
+| appIcons | Icons BB's web app shows in browser tabs, bookmarks and home screens: 'lsp' replaces every BB icon with the LSP one, 'bb' keeps BB's. | string | lsp |
 | pluginVersion | bb-plugin-tutor release downloaded from GitHub at image build: a plain semantic version (no 'v' prefix or range), or 'latest'. The default is the release this Feature pins, verified against its pinned SHA-256; any other version needs pluginSha256. 'latest' resolves to the newest release when the image is built (a prebuilt image keeps it until rebuilt) and is checked only against that release's own .sha256, which catches corruption but not a compromised release. | string | 0.2.0 |
 | pluginSha256 | SHA-256 (64 lower-case hex digits) of bb-plugin-tutor-<pluginVersion>.tgz. Required when pluginVersion is an explicit version other than the pinned default; with the default it must be empty or equal the pin; with 'latest' it must be empty. For an explicit version the release's own .sha256 file is never trusted. | string | - |
 
@@ -186,7 +188,71 @@ when the container starts, apart from the optional course and starter clones.
    it.
 7. Validates `disablePlugins` (comma-separated ids of lower-case letters,
    digits and `-`) and `theme` (a theme id such as `plugin:tutor:paper`), and
-   warns about any listed plugin Tutor needs.
+   warns about any listed plugin Tutor needs. `lightTheme` must be `true` or
+   `false` and `appIcons` `lsp` or `bb`.
+8. Patches BB's web client for `lightTheme` and `appIcons` (next section).
+   This step only ever warns: it never fails the build.
+
+## Light theme and LSP icons (`lightTheme`, `appIcons`)
+
+The course Codespace supports BB's light mode only, and shows the LSP icon
+rather than BB's. Both are patches to the installed bb-app's web client,
+`<bb-app>/app/dist`, made once at image build by `bin/tutor-bb-brand.sh`
+(used only at build time). It finds bb-app by following the bb Feature's
+launcher (or `bb-app`/`bb` on `PATH`) to its real file and walking up to the
+`package.json` named `bb-app`, falling back to the bb Feature's npm prefix
+(`/usr/local/share/bb/npm/lib/node_modules/bb-app`).
+
+**`lightTheme` (default `true`).** BB keeps Settings → Appearance → Theme
+(`light`, `dark` or `system`, default `system`) only in the browser's
+`localStorage`, under `bb.theme`: there is no server setting, CLI or plugin
+API for it. `app/dist/index.html` has an inline boot script that reads
+`bb.theme` to add the `dark` class before the app loads, and the app bundle
+reads the same key when it starts. The Feature makes the first statement of
+that script
+
+```js
+/* tutor-feature: lightTheme */ try { localStorage.setItem("bb.theme", "light"); } catch {}
+```
+
+so every page load starts light, whatever was stored and whatever the
+operating system prefers. A learner who picks Dark or System in Settings gets
+it only until the next reload. The marker comment makes the patch
+idempotent. The precompressed `index.html.br` and `index.html.gz` are
+deleted, because BB's server prefers them to `index.html`; it then serves the
+patched file uncompressed, with an ETag computed from its content. This is
+independent of `theme` (which BB palette, such as Tutor's paper, is
+selected): `lightTheme` picks that palette's light variant. `false` leaves
+`index.html` untouched.
+
+**`appIcons` (default `lsp`).** Every `favicon-*.png` (including `-dark` and
+`-dev`), `apple-touch-icon*.png` and `icon-*.png` (including `-maskable`,
+`-monochrome` and BB's colour variants such as `-blue`) in `app/dist` is
+replaced by the LSP icon of the same pixel size (read from the PNG's `IHDR`
+with `od`; no image tools are needed) and kind, from `icons/`:
+`lsp-tile-<size>.png` for favicons and `purpose: any` icons (the coral tile),
+`lsp-touch-180.png` for Apple touch icons (opaque, full-bleed),
+`lsp-maskable-<size>.png` (full-bleed coral, letters inside the central 80%
+safe zone) and `lsp-monochrome-<size>.png` (white letters on transparency,
+like BB's own). BB's favicon colour setting therefore has no visible effect.
+bb-app 0.43.4 and 0.44.0 ship 53 such files at 16, 32, 180, 192 and 512 px.
+`bb` leaves them untouched. The icons are rendered, each at its own size, from
+[`scripts/tutor-icons/`](../../scripts/tutor-icons) (see its
+`render.mjs`), which is not part of the published Feature. The letters are
+set in Luckiest Guy, Copyright (c) 2010 by Brian J. Bonislawsky DBA
+Astigmatic (AOETI), under the Apache License 2.0.
+
+**When BB changes.** Both patches are written against bb-app 0.43.4 and
+0.44.0. If a later bb-app's `index.html` has no inline script reading
+`localStorage.getItem("bb.theme")`, the build prints a warning and leaves the
+file (and its `.br`/`.gz`) as they are, so BB's own theme choice comes back.
+An icon of a size or kind the Feature has no LSP icon for keeps BB's, with a
+warning, and a bb-app that cannot be found at all is skipped with a warning.
+The patches live in the image: updating bb-app in a running container
+replaces them with BB's originals until the image is rebuilt. BB serves the
+icons with a one-day cache lifetime, so a browser that visited before may
+show BB's icon for up to a day.
+
 
 ## Lifecycle hooks (remote user)
 
@@ -325,12 +391,14 @@ CI runs:
     (no `starter`, so no `repo` in `config.json`); idempotent restarts; the student's outline
     choice kept; `config.json`'s `dataDir`; the unneeded plugins switched off
     once and a re-enabled one kept on; the Tutor theme selected once and a
-    student's own theme kept; `tutor-keepalive` returning at once outside
+    student's own theme kept; BB's boot script pinned to Light (and served
+    that way) and its icons replaced by the LSP ones; `tutor-keepalive` returning at once outside
     Codespaces; and, with the credential-free
     [scripted provider](../../test/tutor/fixtures/scripted-provider), a thread
     Tutor did not spawn is neither offered Tutor's tools nor able to run one.
   - `no_clone_no_outline`: an empty `courseRepo` and `starterRepo`,
-    `selectOutline: false`, an empty `disablePlugins` and an empty `theme` in
+    `selectOutline: false`, an empty `disablePlugins`, an empty `theme`,
+    `lightTheme: false` and `appIcons: bb` (BB's web client untouched) in
     the default state directory;
   - `starter_workspace`: `starter` is `${containerWorkspaceFolder}` with an
     empty `starterRepo`, as in a starter's own Codespace: the variable is
@@ -348,6 +416,16 @@ CI runs:
   repository's tag, a malformed, multi-line or wrong-file `.sha256` (which
   must download nothing) and a `.sha256` that does not match the tarball are
   each refused;
+- a test of the web-client patches (`bb-brand-hermetic.sh`) against copies
+  of the real bb-app 0.43.4 and 0.44.0 `app/dist` (fetched with `npm pack`):
+  the theme pin is the boot script's first statement, running that script
+  stores `light` and adds no `dark` class whatever was stored and whatever
+  the OS prefers, the `.br`/`.gz` are removed, a second run changes nothing,
+  and a boot script without the anchor is warned about and left untouched;
+  every icon is replaced by the LSP icon of its kind and size and nothing
+  else changes, an unknown size keeps BB's with a warning; `lightTheme:
+  false` and `appIcons: bb` each leave their files untouched; and a missing
+  bb-app only warns;
 - a bring-up of the Codespace entry point itself (`codespace-entry.sh`, on
   ports 48886/48887 and with `/workspaces` paths moved under the home
   directory), including the starter clone registered as the BB project
@@ -358,7 +436,7 @@ CI runs:
 
 A real GitHub Codespace remains the owner's acceptance step: the private
 forwarded port, `/workspaces` ownership and persistence of
-`/workspaces/.bb-state`, the outline and theme in a real browser, provider
+`/workspaces/.bb-state`, the outline, theme and LSP icons in a real browser, provider
 sign-in, and whether `tutor-keepalive`'s output keeps the Codespace awake.
 
 

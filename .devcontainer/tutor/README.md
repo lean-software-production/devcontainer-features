@@ -20,7 +20,9 @@ composes:
   [tutor notes](../../src/tutor/NOTES.md#where-the-plugin-comes-from) for what
   checks it then gets. On first start it selects the Tutor paper theme and switches off BB plugins a student
   does not need (Automations, Workflows, Connect and others; see its
-  `disablePlugins` option); a student can turn any back on;
+  `disablePlugins` option); a student can turn any back on. The image
+  pins BB to its light mode and shows the LSP icon in place of BB's (the
+  `lightTheme` and `appIcons` options, tutor Feature 0.7.0);
 - the [Claude Code](../../src/claude-code), [Codex](../../src/codex) and
   [Pi](../../src/pi) Features, which put `claude`, `codex` and `pi` in
   `/usr/local/bin`, on BB's fixed `PATH`, so BB offers all three providers. No

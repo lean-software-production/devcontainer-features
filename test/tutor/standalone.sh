@@ -47,11 +47,19 @@ check "a factory-only config has no repo" bash -c 'node -e "const c=require(\"/u
 check "plugin config is schema version 1" bash -c 'node -e "const c=require(\"/usr/local/etc/tutor/config.json\"); process.exit(c.schemaVersion===1 ? 0 : 1)"'
 check "plugin config names the BB state directory" bash -c 'node -e "const c=require(\"/usr/local/etc/tutor/config.json\"); process.exit(c.dataDir===process.argv[1] ? 0 : 1)" "$state"'
 check "config and options are root-owned and not writable by others" bash -c 'for f in /usr/local/etc/tutor/config.json /usr/local/share/tutor/options.tsv /usr/local/share/tutor/plugin.sha256; do test "$(stat -c %u "$f")" = 0 && test $((8#$(stat -c %a "$f") & 022)) = 0 || exit 1; done'
+# Image build: BB's web client is pinned to Light and wears the LSP icons.
+dist=/usr/local/share/bb/npm/lib/node_modules/bb-app/app/dist
+export dist
+check "BB's theme is pinned to Light in its boot script" bash -c 'grep -qF "/* tutor-feature: lightTheme */ try { localStorage.setItem(\"bb.theme\", \"light\"); } catch {}" "$dist/index.html" && test ! -e "$dist/index.html.br" && test ! -e "$dist/index.html.gz"'
+check "BB's icons are the LSP ones, one per kind and size" bash -c 'cmp "$dist/favicon-32x32.png" "$dist/favicon-32x32-dark.png" && cmp "$dist/icon-512.png" "$dist/icon-512-teal.png" && cmp "$dist/icon-192-maskable.png" "$dist/icon-192-maskable-blue.png" && ! cmp -s "$dist/icon-512.png" "$dist/icon-512-maskable.png"'
 check "lifecycle helpers are installed" bash -c 'command -v tutor-feature-bootstrap && command -v tutor-feature-autostart && command -v tutor-keepalive'
 check "keep-alive returns at once outside a Codespace" bash -c 'timeout 10 tutor-keepalive | grep -q "only runs in a GitHub Codespace"'
 
 # postCreate: the course was cloned.
 check "course was cloned at post-create" bash -c 'git -C /home/node/course rev-parse --verify HEAD && test -f /home/node/course/docs/iterations/README.md'
+
+# postStart: BB, started by the bb Feature, serves the patched boot script.
+check "BB serves the patched index.html" bash -c 'node -e "fetch(process.argv[1]).then((r)=>r.text()).then((t)=>process.exit(t.includes(\"tutor-feature: lightTheme\")?0:1),()=>process.exit(1))" "$BB_SERVER_URL/"'
 
 # postStart: the plugin is path-installed from a user-owned copy of this build.
 check "tutor plugin is running" bash -c 'test "$(plugin_record tutor | cut -f2)" = running'

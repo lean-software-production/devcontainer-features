@@ -134,41 +134,14 @@ if [ -z "${provider}" ]; then
     exit 0
 fi
 
-# --- 5. Sign in -------------------------------------------------------------
-# OpenRouter ships in Fabro's catalog disabled, so the server refuses to sign
-# in to it until settings.toml turns it on.
-if [ "${provider}" = "openrouter" ]; then
-    step "Enabling ${provider}"
-    if ! fabro_enable_provider "${provider}"; then
-        fail "Could not enable ${provider} in ${SETTINGS}."
-        exit 1
-    fi
-    if ! fabro_wait_for_provider "${provider}"; then
-        fail "The Fabro server did not load the ${provider} catalog."
-        info "Check 'fabro model list --provider ${provider}', then run 'fabro-setup --force'."
-        exit 1
-    fi
-    ok "Enabled ${provider} in ~/.fabro/settings.toml"
-fi
-
-step "Signing in to ${provider}"
-if [ "${provider}" = "openai" ]; then
-    info "Fabro will print a URL and a one-time code."
-    info "Ctrl+click the URL, sign in, enter the code, then answer 'y' here."
-fi
-
-if ! fabro provider login --provider "${provider}"; then
-    fail "Login failed. You can retry with: fabro-setup --force"
-    exit 1
-fi
-ok "Signed in to ${provider}"
-
-# --- 6. Make it the default -------------------------------------------------
+# --- 5. Choose the model ----------------------------------------------------
 # Resolve the model to pin, from the `model` Feature option.
 #
-#   auto   built-in preference for the provider, and nothing for the rest
-#   none   provider only, so the provider's own default model is used
-#   <slug> that model, whatever the provider
+#   auto          built-in preference for the provider, and nothing for the rest
+#   none          provider only, so the provider's own default model is used
+#   <id>          that model from the installed Fabro's catalog
+#   <vendor/id>   with OpenRouter, that OpenRouter model, added to the catalog
+#                 under <id> if this Fabro does not ship it
 #
 # Under `auto`, OpenAI gets gpt-5.6-luna: it is the cheapest model in the
 # GPT-5.6 line at $1/$6 per Mtok, which suits the usage limits of a ChatGPT or
@@ -185,21 +158,83 @@ case "${DEFAULT_MODEL}" in
     *) preferred_model="${DEFAULT_MODEL}" ;;
 esac
 
+# OpenRouter ships in Fabro's catalog disabled, so the server refuses to sign
+# in to it, or list its models, until settings.toml turns it on.
+if [ "${provider}" = "openrouter" ]; then
+    step "Enabling ${provider}"
+    if ! fabro_enable_provider "${provider}"; then
+        fail "Could not enable ${provider} in ${SETTINGS}."
+        exit 1
+    fi
+    if ! fabro_wait_for_provider "${provider}"; then
+        fail "The Fabro server did not load the ${provider} catalog."
+        info "Check 'fabro model list --provider ${provider}', then run 'fabro-setup --force'."
+        exit 1
+    fi
+    ok "Enabled ${provider} in ~/.fabro/settings.toml"
+fi
+
+# Each edit counts only once the server has loaded it; an older Fabro rejects
+# per-model settings, and fabro_edit_settings_or_restore then undoes the edit.
+add_openrouter_model() {
+    fabro_add_openrouter_model "$1" "$2" && fabro_wait_for_model openrouter "$2"
+}
+use_catalog_model() {
+    fabro_use_catalog_model "$1" "$2" && fabro_wait_for_default_model "$1" "$2"
+}
+
 # Only pin a model this Fabro actually serves. The version is a Feature option,
 # so an older pin may predate the slug, and a name the catalog cannot resolve
 # fails every run rather than falling back.
-model=""
-if [ -n "${preferred_model}" ]; then
-    if fabro model list --json 2>/dev/null \
+model="${preferred_model##*/}"
+in_provider_catalog=0
+if [ -n "${model}" ]; then
+    if fabro_catalog_models "${provider}" | grep -qxF "${model}"; then
+        in_provider_catalog=1
+    elif [ "${provider}" = "openrouter" ] && [ "${preferred_model}" != "${model}" ]; then
+        step "Adding ${preferred_model} to the model catalog"
+        if fabro_edit_settings_or_restore add_openrouter_model "${preferred_model}" "${model}"; then
+            ok "Added ${model} to ~/.fabro/settings.toml"
+            in_provider_catalog=1
+        else
+            warn "Could not add ${preferred_model} to this Fabro's catalog."
+            model=""
+        fi
+    elif ! fabro model list --json 2>/dev/null \
         | awk -F'"' '/"id"[[:space:]]*:/ { print $4 }' \
-        | grep -qx "${preferred_model}"; then
-        model="${preferred_model}"
-    else
+        | grep -qxF "${model}"; then
         warn "${preferred_model} is not in this Fabro's model catalog."
-        info "Pinning the provider only; ${provider} picks its own default model."
+        model=""
+    fi
+    [ -z "${model}" ] && info "Pinning the provider only; ${provider} picks its own default model."
+fi
+
+# API-key providers check the key against the catalog's probe model, which may
+# not be one the key is allowed to use. OpenAI signs in over OAuth instead.
+if [ "${in_provider_catalog}" -eq 1 ] && [ "${provider}" != "openai" ]; then
+    step "Checking the key with ${model}"
+    if fabro_edit_settings_or_restore use_catalog_model "${provider}" "${model}"; then
+        ok "Sign-in will test the key against ${model}"
+    else
+        warn "This Fabro did not accept ${model} as its ${provider} default."
+        info "Sign-in tests the key against the catalog's own default model."
     fi
 fi
 
+# --- 6. Sign in -------------------------------------------------------------
+step "Signing in to ${provider}"
+if [ "${provider}" = "openai" ]; then
+    info "Fabro will print a URL and a one-time code."
+    info "Ctrl+click the URL, sign in, enter the code, then answer 'y' here."
+fi
+
+if ! fabro provider login --provider "${provider}"; then
+    fail "Login failed. You can retry with: fabro-setup --force"
+    exit 1
+fi
+ok "Signed in to ${provider}"
+
+# --- 7. Make it the default -------------------------------------------------
 step "Applying server defaults"
 # Server startup flags are authoritative for server-backed runs. Keep their
 # values in feature-owned state so autostart can restore them after restarts.
@@ -227,7 +262,7 @@ else
     exit 1
 fi
 
-# --- 7. Verify --------------------------------------------------------------
+# --- 8. Verify --------------------------------------------------------------
 step "Verifying"
 if fabro-status; then
     touch "${MARKER}" 2>/dev/null || true

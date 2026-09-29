@@ -71,6 +71,24 @@ Anthropic and OpenRouter prompt for an API key instead. Fabro ships
 OpenRouter disabled, so choosing it also sets `enabled = true` under
 `[llm.providers.openrouter]` in `~/.fabro/settings.toml` before signing in.
 
+Fabro checks an API key by sending one request to the catalog's probe model,
+which for OpenRouter is Claude Sonnet. A key limited to other models, such as
+by an OpenRouter guardrail, fails that check. When the `model` option names a
+model, the wizard makes it the provider's probe and default model in
+`~/.fabro/settings.toml` first, so the check uses a model the key can reach:
+
+```jsonc
+"ghcr.io/lean-software-production/devcontainer-features/fabro:1": {
+  "provider": "openrouter",
+  "model": "z-ai/glm-5.3-flash"
+}
+```
+
+An OpenRouter `vendor/model` slug that the installed Fabro does not ship is
+added to its catalog, with limits, features and prices from OpenRouter's public
+model list. Older Fabro releases, such as 0.254.0, reject per-model settings;
+the wizard then puts the file back and signs in with the catalog default.
+
 Credentials go into the Fabro server's vault under `~/.fabro`. Nothing is
 written to the repository.
 

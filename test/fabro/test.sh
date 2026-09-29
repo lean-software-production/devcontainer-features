@@ -27,6 +27,31 @@ check "browse url is localhost outside codespaces" bash -c \
   "source /usr/local/share/fabro/bin/fabro-common.sh && unset CODESPACE_NAME GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN && fabro_browse_url | grep -q '^http://localhost:32276$'"
 check "browse url uses the forwarded host in a codespace" bash -c \
   "source /usr/local/share/fabro/bin/fabro-common.sh && CODESPACE_NAME=demo GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN=app.github.dev fabro_browse_url | grep -q '^https://demo-32276.app.github.dev$'"
+# OpenRouter ships disabled, and the server rejects a login to it until
+# settings.toml enables it. The helper must add the table, flip an existing
+# `enabled = false`, and leave an already-enabled file with a single entry.
+check "enable provider adds a missing table" bash -c '
+  set -e
+  export HOME="$(mktemp -d)" && mkdir -p "$HOME/.fabro"
+  printf "_version = 1\n\n[server.web]\nenabled = true\n" > "$HOME/.fabro/settings.toml"
+  source /usr/local/share/fabro/bin/fabro-common.sh && fabro_enable_provider openrouter
+  awk "/^\\[/{t=\$0} t==\"[llm.providers.openrouter]\" && /^enabled = true\$/{n++} END{exit n!=1}" "$HOME/.fabro/settings.toml"
+  grep -q "^\[server.web\]" "$HOME/.fabro/settings.toml"'
+check "enable provider flips enabled = false" bash -c '
+  set -e
+  export HOME="$(mktemp -d)" && mkdir -p "$HOME/.fabro"
+  printf "[llm.providers.openrouter]\nenabled = false\n\n[server.web]\nenabled = true\n" > "$HOME/.fabro/settings.toml"
+  source /usr/local/share/fabro/bin/fabro-common.sh && fabro_enable_provider openrouter
+  if grep -q "enabled = false" "$HOME/.fabro/settings.toml"; then exit 1; fi
+  test "$(grep -c "^\[llm.providers.openrouter\]" "$HOME/.fabro/settings.toml")" = 1'
+check "enable provider is idempotent" bash -c '
+  set -e
+  export HOME="$(mktemp -d)" && mkdir -p "$HOME/.fabro"
+  printf "_version = 1\n" > "$HOME/.fabro/settings.toml"
+  source /usr/local/share/fabro/bin/fabro-common.sh
+  fabro_enable_provider openrouter && fabro_enable_provider openrouter
+  test "$(grep -c "^\[llm.providers.openrouter\]" "$HOME/.fabro/settings.toml")" = 1
+  test "$(grep -c "^enabled = true\$" "$HOME/.fabro/settings.toml")" = 1'
 check "options recorded for runtime" bash -c "grep -q '^FABRO_SETUP_PROVIDER=' /usr/local/share/fabro/setup.env"
 check "model option defaults to auto" bash -c "grep -q '^FABRO_SETUP_MODEL=auto$' /usr/local/share/fabro/setup.env"
 check "shell banner wired into bashrc" bash -c "grep -q 'fabro/banner.sh' /etc/bash.bashrc"

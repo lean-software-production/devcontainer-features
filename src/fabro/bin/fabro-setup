@@ -135,6 +135,22 @@ if [ -z "${provider}" ]; then
 fi
 
 # --- 5. Sign in -------------------------------------------------------------
+# OpenRouter ships in Fabro's catalog disabled, so the server refuses to sign
+# in to it until settings.toml turns it on.
+if [ "${provider}" = "openrouter" ]; then
+    step "Enabling ${provider}"
+    if ! fabro_enable_provider "${provider}"; then
+        fail "Could not enable ${provider} in ${SETTINGS}."
+        exit 1
+    fi
+    if ! fabro_wait_for_provider "${provider}"; then
+        fail "The Fabro server did not load the ${provider} catalog."
+        info "Check 'fabro model list --provider ${provider}', then run 'fabro-setup --force'."
+        exit 1
+    fi
+    ok "Enabled ${provider} in ~/.fabro/settings.toml"
+fi
+
 step "Signing in to ${provider}"
 if [ "${provider}" = "openai" ]; then
     info "Fabro will print a URL and a one-time code."

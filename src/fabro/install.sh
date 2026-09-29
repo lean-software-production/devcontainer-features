@@ -19,10 +19,14 @@ echo "Installing Fabro (version=${FABRO_VERSION}, provider=${FABRO_PROVIDER}, mo
 
 # --- dependencies -----------------------------------------------------------
 # curl and ca-certificates are needed both to fetch the release and, later, for
-# the device-code login to reach auth.openai.com.
-if ! command -v curl >/dev/null 2>&1; then
+# the device-code login to reach auth.openai.com. The setup scripts read
+# `fabro model list --json` and OpenRouter's model list with jq.
+packages=()
+command -v curl >/dev/null 2>&1 || packages+=(curl ca-certificates)
+command -v jq >/dev/null 2>&1 || packages+=(jq)
+if [ "${#packages[@]}" -gt 0 ]; then
     apt-get update -y
-    apt-get install -y --no-install-recommends curl ca-certificates
+    apt-get install -y --no-install-recommends "${packages[@]}"
     rm -rf /var/lib/apt/lists/*
 fi
 

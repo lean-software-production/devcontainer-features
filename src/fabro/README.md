@@ -17,7 +17,7 @@ Installs the Fabro CLI and a guided setup wizard that connects Fabro to a ChatGP
 |-----|-----|-----|-----|
 | version | Fabro version to install. Use 'latest' to track the newest release, or pin an exact version for reproducible containers. | string | 0.254.0 |
 | provider | Which LLM provider the setup wizard offers first. 'openai' uses a ChatGPT/Codex subscription over OAuth device code; the others prompt for an API key. | string | openai |
-| model | Model passed to the Fabro server as its default once the wizard signs in. 'auto' uses the built-in preference for the chosen provider (gpt-5.6-luna for OpenAI) and the provider's own default elsewhere. 'none' pins the provider only. Any other value is used as the model slug. A model the installed Fabro's catalog does not serve is skipped rather than pinned. | string | auto |
+| model | Model passed to the Fabro server as its default once the wizard signs in. For Anthropic and OpenRouter, sign-in also tests the API key against this model rather than the catalog default, which suits a key limited to certain models. 'auto' uses the built-in preference for the chosen provider (gpt-5.6-luna for OpenAI) and the provider's own default elsewhere. 'none' pins the provider only. Any other value is used as the model slug; with OpenRouter, a 'vendor/model' slug such as 'z-ai/glm-5.3-flash' is added to the catalog if the installed Fabro does not ship it. A model the installed Fabro's catalog does not serve is skipped rather than pinned. | string | auto |
 | autoStartServer | Start the local Fabro server automatically when the container is created. | boolean | true |
 | shellBanner | Print a one-line 'run fabro-setup' hint in new interactive shells until setup is complete. Covers clients that do not run VS Code tasks. | boolean | true |
 
@@ -93,6 +93,24 @@ survive the browser-based Codespaces editor without extra port plumbing.
 Anthropic and OpenRouter prompt for an API key instead. Fabro ships
 OpenRouter disabled, so choosing it also sets `enabled = true` under
 `[llm.providers.openrouter]` in `~/.fabro/settings.toml` before signing in.
+
+Fabro checks an API key by sending one request to the catalog's probe model,
+which for OpenRouter is Claude Sonnet. A key limited to other models, such as
+by an OpenRouter guardrail, fails that check. When the `model` option names a
+model, the wizard makes it the provider's probe and default model in
+`~/.fabro/settings.toml` first, so the check uses a model the key can reach:
+
+```jsonc
+"ghcr.io/lean-software-production/devcontainer-features/fabro:1": {
+  "provider": "openrouter",
+  "model": "z-ai/glm-5.3-flash"
+}
+```
+
+An OpenRouter `vendor/model` slug that the installed Fabro does not ship is
+added to its catalog, with limits, features and prices from OpenRouter's public
+model list. Older Fabro releases, such as 0.254.0, reject per-model settings;
+the wizard then puts the file back and signs in with the catalog default.
 
 Credentials go into the Fabro server's vault under `~/.fabro`. Nothing is
 written to the repository.

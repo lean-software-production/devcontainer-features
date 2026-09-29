@@ -67,7 +67,9 @@ Codespace, VS Code Desktop, and a plain SSH session. This is what makes the
 wizard portable; provider logins that use a PKCE callback to `localhost` do not
 survive the browser-based Codespaces editor without extra port plumbing.
 
-Anthropic and OpenRouter prompt for an API key instead.
+Anthropic and OpenRouter prompt for an API key instead. Fabro ships
+OpenRouter disabled, so choosing it also sets `enabled = true` under
+`[llm.providers.openrouter]` in `~/.fabro/settings.toml` before signing in.
 
 Credentials go into the Fabro server's vault under `~/.fabro`. Nothing is
 written to the repository.

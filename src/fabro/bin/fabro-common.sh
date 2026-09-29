@@ -112,6 +112,46 @@ fabro_sync_server_urls() {
     ' "${settings}" > "${tmp}" && mv "${tmp}" "${settings}"
 }
 
+# Some providers, such as OpenRouter, ship in Fabro's catalog but disabled.
+# Until settings.toml enables them the server rejects `fabro provider login`
+# with "provider '<name>' is not configured in the server model catalog".
+# Set `enabled = true` in [llm.providers.<name>], adding the table if needed.
+fabro_enable_provider() {
+    local provider="$1" settings tmp
+    settings="${HOME}/.fabro/settings.toml"
+    [ -f "${settings}" ] || return 1
+    tmp="$(mktemp "${settings}.tmp.XXXXXX")" || return 1
+
+    awk -v table="[llm.providers.${provider}]" '
+        BEGIN { in_table = 0; saw_table = 0; wrote = 0 }
+        /^\[/ {
+            if (in_table && !wrote) { print "enabled = true"; wrote = 1 }
+            in_table = ($0 == table)
+            if (in_table) saw_table = 1
+            print
+            next
+        }
+        in_table && /^enabled[[:space:]]*=/ { print "enabled = true"; wrote = 1; next }
+        { print }
+        END {
+            if (in_table && !wrote) print "enabled = true"
+            if (!saw_table) print "\n" table "\nenabled = true"
+        }
+    ' "${settings}" > "${tmp}" && mv "${tmp}" "${settings}"
+}
+
+# The server live-reloads settings.toml a few seconds after it changes. Wait
+# until the provider's models appear in the catalog, for up to $2 seconds.
+fabro_wait_for_provider() {
+    local provider="$1" timeout="${2:-15}" i
+    for ((i = 0; i < timeout; i++)); do
+        fabro model list --provider "${provider}" --json 2>/dev/null \
+            | grep -q '"id"' && return 0
+        sleep 1
+    done
+    return 1
+}
+
 # Start the server if it is not already up, with its persisted setup defaults.
 fabro_start_server() {
     fabro_sync_server_urls || return 1

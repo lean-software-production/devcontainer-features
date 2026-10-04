@@ -29,16 +29,21 @@ bb_feature_validate_options() {
     BB_FEATURE_RAW_DATA_DIR="$(bb_feature_option DATA_DIR)"
     BB_FEATURE_APP_URL_OPTION="$(bb_feature_option APP_URL)"
     BB_FEATURE_APP_BIN="$(bb_feature_option BB_APP_BIN)"
-    case "$BB_FEATURE_MODE" in cli|standalone) ;; *) bb_feature_fail "invalid saved mode"; return 1;; esac
+    # Absent from options written by Feature 1.0.x, which had no machine mode.
+    BB_FEATURE_SERVER_URL_OPTION="$(bb_feature_option SERVER_URL 2>/dev/null || true)"
+    case "$BB_FEATURE_MODE" in cli|standalone|machine) ;; *) bb_feature_fail "invalid saved mode"; return 1;; esac
     case "$BB_FEATURE_AUTOSTART" in true|false) ;; *) bb_feature_fail "invalid saved autoStart"; return 1;; esac
     bb_feature_port "$BB_FEATURE_SERVER_PORT" && bb_feature_port "$BB_FEATURE_DAEMON_PORT" && [ "$BB_FEATURE_SERVER_PORT" != "$BB_FEATURE_DAEMON_PORT" ] || { bb_feature_fail "invalid saved ports"; return 1; }
     [ -x "$BB_FEATURE_APP_BIN" ] && [[ "$BB_FEATURE_APP_BIN" = "${BB_FEATURE_SHARE}/npm/bin/bb-app" ]] || { bb_feature_fail "packaged bb-app launcher is missing or unexpected"; return 1; }
     [ -z "$BB_FEATURE_RAW_DATA_DIR" ] || { [[ "$BB_FEATURE_RAW_DATA_DIR" = /* ]] && ! bb_feature_unsafe "$BB_FEATURE_RAW_DATA_DIR"; } || { bb_feature_fail "unsafe saved dataDir"; return 1; }
     [ "$BB_FEATURE_APP_URL_OPTION" = auto ] || ! bb_feature_unsafe "$BB_FEATURE_APP_URL_OPTION" || { bb_feature_fail "unsafe saved appUrl"; return 1; }
+    [ -z "$BB_FEATURE_SERVER_URL_OPTION" ] || ! bb_feature_unsafe "$BB_FEATURE_SERVER_URL_OPTION" || { bb_feature_fail "unsafe saved serverUrl"; return 1; }
 }
 
 bb_feature_data_dir() {
-    if [ -n "$BB_FEATURE_RAW_DATA_DIR" ]; then printf '%s' "$BB_FEATURE_RAW_DATA_DIR"; else printf '%s/.bb' "$HOME"; fi
+    if [ -n "$BB_FEATURE_RAW_DATA_DIR" ]; then printf '%s' "$BB_FEATURE_RAW_DATA_DIR"
+    elif [ "$BB_FEATURE_MODE" = machine ]; then printf '%s/.bb-machine' "$HOME"
+    else printf '%s/.bb' "$HOME"; fi
 }
 
 bb_feature_no_symlink_ancestors() {

@@ -1,0 +1,181 @@
+#!/usr/bin/env bash
+# Machine mode: this container is a BB machine of a hosted BB server (for
+# example a learner's Tutor server), reached over https. The learner's
+# workspace, coding agents and BB's host entry run here; the server runs
+# elsewhere.
+#
+#   bb-feature-machine bootstrap   postCreate: prepare the state directory
+#   bb-feature-machine autostart   postStart: enrol once, then start the host daemon
+#   bb-feature-machine status      is the daemon running and connected?
+#
+# Per-learner values come from the environment, so one devcontainer.json
+# serves every learner (set them as Codespaces secrets):
+#   BB_MACHINE_SERVER_URL              the server's https origin (unless the serverUrl option is set)
+#   BB_MACHINE_ACCESS_CLIENT_ID        optional: a Cloudflare Access service token in front of the
+#   BB_MACHINE_ACCESS_CLIENT_SECRET    server, sent as CF-Access-Client-Id / CF-Access-Client-Secret
+#
+# The token never reaches an argv, the logs or stdout: it goes to the daemon
+# as BB_SERVER_HEADERS through a 0600 file in the 0700 runtime directory, and
+# to curl through a 0600 config file.
+# shellcheck disable=SC2016 # the single-quoted strings are JavaScript and sh -c bodies
+# shellcheck source=bb-feature-common.sh
+set -euo pipefail
+. /usr/local/share/bb/bin/bb-feature-common.sh
+
+bb_feature_validate_options
+[ "$BB_FEATURE_MODE" = machine ] || exit 0
+
+machine_server_url() {
+    local value="${BB_FEATURE_SERVER_URL_OPTION:-}"
+    [ -n "$value" ] || value="${BB_MACHINE_SERVER_URL:-}"
+    [ -n "$value" ] || return 1
+    ! bb_feature_unsafe "$value" || { bb_feature_fail "the server URL contains unsafe characters"; return 2; }
+    node -e 'const v=process.argv[1]; let u; try { u=new URL(v); } catch { process.exit(2); } if (u.protocol!=="https:"||u.origin!==v||u.username||u.password) process.exit(2);' "$value" \
+        || { bb_feature_fail "the server URL must be an https origin with no path, query, fragment or credentials"; return 2; }
+    printf '%s' "$value"
+}
+
+# write_secret_files: the daemon's environment file and curl's config, from the
+# token in this process's environment (absent: no headers).
+write_secret_files() {
+    local env_file="$BB_FEATURE_RUNTIME_DIR/machine.env" curl_file="$BB_FEATURE_RUNTIME_DIR/curl.conf"
+    umask 077
+    : > "$curl_file"
+    { printf 'BB_DATA_DIR=%s\n' "$BB_FEATURE_DATA_DIR"; } > "$env_file"
+    if [ -n "${BB_MACHINE_ACCESS_CLIENT_ID:-}" ] || [ -n "${BB_MACHINE_ACCESS_CLIENT_SECRET:-}" ]; then
+        [ -n "${BB_MACHINE_ACCESS_CLIENT_ID:-}" ] && [ -n "${BB_MACHINE_ACCESS_CLIENT_SECRET:-}" ] \
+            || { bb_feature_fail "set both BB_MACHINE_ACCESS_CLIENT_ID and BB_MACHINE_ACCESS_CLIENT_SECRET, or neither"; return 1; }
+        # Single-quoted JSON: the session shell sources this file with set -a.
+        node -e '
+            const id = process.env.BB_MACHINE_ACCESS_CLIENT_ID, secret = process.env.BB_MACHINE_ACCESS_CLIENT_SECRET;
+            if (/[\x27\s"\\]/.test(id + secret)) process.exit(2);
+            process.stdout.write("BB_SERVER_HEADERS=\x27" + JSON.stringify({ "CF-Access-Client-Id": id, "CF-Access-Client-Secret": secret }) + "\x27\n");
+        ' >> "$env_file" || { bb_feature_fail "the Access token contains characters it never should"; return 1; }
+        node -e '
+            process.stdout.write(`header = "CF-Access-Client-Id: ${process.env.BB_MACHINE_ACCESS_CLIENT_ID}"\nheader = "CF-Access-Client-Secret: ${process.env.BB_MACHINE_ACCESS_CLIENT_SECRET}"\n`);
+        ' > "$curl_file"
+    fi
+    chmod 0600 "$env_file" "$curl_file"
+}
+
+# enroll_key: when this machine holds no credential yet, ask the server for an
+# enroll key and add it to the daemon's environment file. bb-app's own
+# `host-daemon join` makes this request without BB_SERVER_HEADERS (0.45.0), so
+# an Access-protected server answers it with a login page; it is made here,
+# with the token. The server grants enroll keys to loopback callers, which a
+# server behind cloudflared on its own box sees.
+enroll_key() {
+    local url="$1" response
+    [ ! -s "$BB_FEATURE_DATA_DIR/auth.json" ] || return 0
+    response="$(curl --fail --silent --show-error --max-time 30 -K "$BB_FEATURE_RUNTIME_DIR/curl.conf" \
+        -H 'content-type: application/json' -d '{}' "$url/internal/hosts/enroll-key")" \
+        || { bb_feature_fail "the server refused an enroll key (is the Access token right, and allowed by a Service Auth policy?)"; return 1; }
+    printf '%s' "$response" | node -e '
+        let r = ""; process.stdin.on("data", (c) => (r += c)).on("end", () => {
+            let k; try { k = JSON.parse(r); } catch { process.exit(2); }
+            if (typeof k.enrollKey !== "string" || typeof k.hostId !== "string" || /[\s\x27"]/.test(k.enrollKey + k.hostId)) process.exit(2);
+            process.stdout.write(`BB_HOST_ENROLL_KEY=${k.enrollKey}\nBB_HOST_ID=${k.hostId}\n`);
+        });' >> "$BB_FEATURE_RUNTIME_DIR/machine.env" || { bb_feature_fail "the server's enroll-key answer was not one (an Access login page?)"; return 1; }
+}
+
+machine_alive() {
+    bb_feature_read_runtime 2>/dev/null || return 1
+    kill -0 "$BB_FEATURE_PID" 2>/dev/null || return 1
+    [ "$(stat -c %u -- "/proc/$BB_FEATURE_PID")" = "$(id -u)" ] || return 1
+    local command_line
+    command_line="$(tr '\000' ' ' < "/proc/$BB_FEATURE_PID/cmdline" 2>/dev/null || true)"
+    [[ "$command_line" == *"$BB_FEATURE_APP_BIN host-daemon --server-url"* ]]
+}
+
+machine_connected() {
+    # The daemon logs each session in host-daemon.<n>.log (not the busy
+    # host-daemon-stdio.log); the newest such line says where it stands.
+    local log
+    # shellcheck disable=SC2012 # BB names its own log files
+    log="$(ls -t "$BB_FEATURE_DATA_DIR"/logs/host-daemon.[0-9]*.log 2>/dev/null | head -n 1)"
+    [ -n "$log" ] && grep -h '"msg":"\(Connected to\|Disconnected from\) server"' "$log" | tail -n 1 | grep -q 'Connected to server'
+}
+
+cmd_bootstrap() {
+    bb_feature_prepare_data_dir
+    printf 'BB machine state prepared at %s\n' "$BB_FEATURE_DATA_DIR"
+}
+
+cmd_autostart() {
+    [ "$BB_FEATURE_AUTOSTART" = true ] || exit 0
+    bb_feature_prepare_data_dir
+    local url
+    if ! url="$(machine_server_url)"; then
+        # A container without the learner's secrets still starts; say what's missing.
+        echo "BB machine: no server URL yet. Add the Codespaces secret BB_MACHINE_SERVER_URL (and BB_MACHINE_ACCESS_CLIENT_ID / BB_MACHINE_ACCESS_CLIENT_SECRET), then rebuild or run bb-feature-autostart."
+        exit 0
+    fi
+
+    local lock_file="$BB_FEATURE_RUNTIME_DIR/autostart.lock"
+    [ ! -L "$lock_file" ] || { bb_feature_fail "autostart lock is a symlink"; exit 1; }
+    umask 077
+    : > "$lock_file"
+    exec 9>"$lock_file"
+    flock -w 90 9 || { bb_feature_fail "another BB machine start is still running"; exit 1; }
+
+    if machine_alive; then echo "BB machine is already running (pid $BB_FEATURE_PID)."; exit 0; fi
+    rm -f -- "$BB_FEATURE_RUNTIME_DIR/launcher.tsv"
+
+    write_secret_files
+    enroll_key "$url"
+    # Not secret: for status, which runs without the learner's environment.
+    printf '%s\n' "$url" > "$BB_FEATURE_RUNTIME_DIR/server-url"
+
+    local log_file="$BB_FEATURE_RUNTIME_DIR/machine.log" pid_handoff launcher_pid=
+    pid_handoff="$(mktemp "$BB_FEATURE_RUNTIME_DIR/machine-start.XXXXXX")"
+    # A new session survives Codespaces' lifecycle process-group cleanup (as
+    # standalone mode's launcher does); --supervise restarts the daemon when
+    # it crashes, since nothing else here will.
+    nohup setsid sh -c '
+        printf "%s\n" "$$" > "$1"
+        set -a; . "$2"; set +a
+        exec "$3" host-daemon --server-url "$4" --host-daemon-port "$5" --supervise
+    ' bb-machine-session "$pid_handoff" "$BB_FEATURE_RUNTIME_DIR/machine.env" "$BB_FEATURE_APP_BIN" "$url" "$BB_FEATURE_DAEMON_PORT" \
+        >> "$log_file" 2>&1 </dev/null 9>&- &
+    for _ in $(seq 1 50); do
+        if IFS= read -r launcher_pid < "$pid_handoff" 2>/dev/null && [[ "$launcher_pid" =~ ^[0-9]+$ ]]; then break; fi
+        launcher_pid=; sleep .1
+    done
+    rm -f -- "$pid_handoff"
+    [ -n "$launcher_pid" ] || { bb_feature_fail "the BB machine did not start; see $log_file"; exit 1; }
+    bb_feature_write_runtime "$launcher_pid"
+
+    for _ in $(seq 1 60); do
+        if [ -s "$BB_FEATURE_DATA_DIR/auth.json" ] && machine_connected; then
+            # Enrolled: the one-time key is spent; keep only the headers.
+            sed -i '/^BB_HOST_ENROLL_KEY=\|^BB_HOST_ID=/d' "$BB_FEATURE_RUNTIME_DIR/machine.env"
+            echo "BB machine is connected to $url."
+            exit 0
+        fi
+        kill -0 "$launcher_pid" 2>/dev/null || break
+        sleep 1
+    done
+    bb_feature_fail "the BB machine did not connect to $url within 60 seconds; see $log_file and $BB_FEATURE_DATA_DIR/logs/"
+    exit 1
+}
+
+cmd_status() {
+    bb_feature_prepare_data_dir
+    local url; url="$(machine_server_url 2>/dev/null)" || url="$(cat "$BB_FEATURE_RUNTIME_DIR/server-url" 2>/dev/null)" || url="(no server URL yet)"
+    if machine_alive && machine_connected; then
+        echo "BB machine is connected to $url (pid $BB_FEATURE_PID, host $(cat "$BB_FEATURE_DATA_DIR/host-id" 2>/dev/null || echo '?'))."
+        exit 0
+    elif machine_alive; then
+        echo "BB machine is running but not connected to $url; it keeps retrying (see $BB_FEATURE_DATA_DIR/logs/)."
+        exit 1
+    fi
+    echo "BB machine is not running. Run bb-feature-autostart."
+    exit 1
+}
+
+case "${1:-}" in
+    bootstrap) cmd_bootstrap ;;
+    autostart) cmd_autostart ;;
+    status) cmd_status ;;
+    *) echo "usage: bb-feature-machine bootstrap|autostart|status" >&2; exit 2 ;;
+esac

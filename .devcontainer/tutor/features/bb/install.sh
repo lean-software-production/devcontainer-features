@@ -11,6 +11,7 @@ BB_SERVER_PORT="${SERVERPORT:-38886}"
 BB_HOST_DAEMON_PORT="${HOSTDAEMONPORT:-38887}"
 BB_DATA_DIR="${DATADIR:-}"
 BB_APP_URL="${APPURL:-auto}"
+BB_SERVER_URL_OPTION="${SERVERURL:-}"
 
 FEATURE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SHARE_DIR=/usr/local/share/bb
@@ -23,13 +24,14 @@ valid_port() { [[ "$1" =~ ^[0-9]+$ ]] && [ "$1" -ge 1024 ] && [ "$1" -le 65535 ]
 has_unsafe_chars() { [[ "$1" =~ [[:cntrl:]] ]] || [[ "$1" == *';'* || "$1" == *'|'* || "$1" == *'&'* || "$1" == *'$'* || "$1" == *'`'* || "$1" == *'<'* || "$1" == *'>'* ]]; }
 
 [ "$BB_VERSION" = latest ] || valid_semver "$BB_VERSION" || fail "version must be 'latest' or an exact semantic version; received '$BB_VERSION'."
-case "$BB_MODE" in cli|standalone) ;; *) fail "mode must be 'cli' or 'standalone'; received '$BB_MODE'." ;; esac
+case "$BB_MODE" in cli|standalone|machine) ;; *) fail "mode must be 'cli', 'standalone' or 'machine'; received '$BB_MODE'." ;; esac
 case "$BB_AUTOSTART" in true|false) ;; *) fail "autoStart must be true or false; received '$BB_AUTOSTART'." ;; esac
 valid_port "$BB_SERVER_PORT" || fail "serverPort must be an integer from 1024 through 65535."
 valid_port "$BB_HOST_DAEMON_PORT" || fail "hostDaemonPort must be an integer from 1024 through 65535."
 [ "$BB_SERVER_PORT" != "$BB_HOST_DAEMON_PORT" ] || fail "serverPort and hostDaemonPort must be different."
 [ -z "$BB_DATA_DIR" ] || { [[ "$BB_DATA_DIR" = /* ]] && ! has_unsafe_chars "$BB_DATA_DIR"; } || fail "dataDir must be an absolute path without control characters or shell metacharacters."
 [ "$BB_APP_URL" = auto ] || { ! has_unsafe_chars "$BB_APP_URL"; } || fail "appUrl contains unsafe characters."
+[ -z "$BB_SERVER_URL_OPTION" ] || { ! has_unsafe_chars "$BB_SERVER_URL_OPTION"; } || fail "serverUrl contains unsafe characters."
 
 [ "$(uname -s)" = Linux ] || fail "this Feature supports Linux dev containers only."
 case "$(uname -m)" in x86_64|amd64) ;; *) fail "this MVP is supported and tested on Linux amd64 only; found $(uname -m)." ;; esac
@@ -42,6 +44,10 @@ command -v npm >/dev/null 2>&1 || fail "npm is required. Use a Node.js base imag
 if [ "$BB_APP_URL" != auto ]; then
     node -e 'const v=process.argv[1]; let u; try { u=new URL(v); } catch { process.exit(2); } if (!/^https?:$/.test(u.protocol)||u.origin!==v||u.username||u.password) process.exit(2);' "$BB_APP_URL" \
         || fail "appUrl must be an http(s) origin with no path, query, fragment, or credentials."
+fi
+if [ -n "$BB_SERVER_URL_OPTION" ]; then
+    node -e 'const v=process.argv[1]; let u; try { u=new URL(v); } catch { process.exit(2); } if (u.protocol!=="https:"||u.origin!==v||u.username||u.password) process.exit(2);' "$BB_SERVER_URL_OPTION" \
+        || fail "serverUrl must be an https origin with no path, query, fragment, or credentials."
 fi
 NODE_VERSION="$(node --version)"
 if [[ "$NODE_VERSION" =~ ^v([0-9]+)\.([0-9]+)\. ]]; then
@@ -116,6 +122,7 @@ write_option() { printf '%s\t%s\n' "$1" "$2"; }
     write_option HOST_DAEMON_PORT "$BB_HOST_DAEMON_PORT"
     write_option DATA_DIR "$BB_DATA_DIR"
     write_option APP_URL "$BB_APP_URL"
+    write_option SERVER_URL "$BB_SERVER_URL_OPTION"
     write_option BB_APP_BIN "$BB_APP_BIN"
 } > "$SHARE_DIR/options.tsv"
 chown root:root "$SHARE_DIR/options.tsv"
@@ -140,10 +147,11 @@ link_bb_command bb-host-daemon
 install -m 0755 "$FEATURE_DIR/bin/bb-feature-bootstrap" "$SHARE_DIR/bin/bb-feature-bootstrap"
 install -m 0755 "$FEATURE_DIR/bin/bb-feature-autostart" "$SHARE_DIR/bin/bb-feature-autostart"
 install -m 0755 "$FEATURE_DIR/bin/bb-feature-status" "$SHARE_DIR/bin/bb-feature-status"
+install -m 0755 "$FEATURE_DIR/bin/bb-feature-machine" "$SHARE_DIR/bin/bb-feature-machine"
 install -m 0644 "$FEATURE_DIR/bin/bb-feature-common.sh" "$SHARE_DIR/bin/bb-feature-common.sh"
 install -m 0644 "$FEATURE_DIR/NOTICE" "$SHARE_DIR/NOTICE"
 ln -sfn "$SHARE_DIR/bin/bb-feature-bootstrap" /usr/local/bin/bb-feature-bootstrap
 ln -sfn "$SHARE_DIR/bin/bb-feature-autostart" /usr/local/bin/bb-feature-autostart
 ln -sfn "$SHARE_DIR/bin/bb-feature-status" /usr/local/bin/bb-feature-status
 
-echo "Installed bb-app ${INSTALLED_VERSION} in ${NPM_PREFIX}; standalone mode is user-started only."
+echo "Installed bb-app ${INSTALLED_VERSION} in ${NPM_PREFIX} (mode ${BB_MODE}); nothing runs until the lifecycle hooks."

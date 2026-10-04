@@ -103,6 +103,72 @@ user-owned state only after taking a user-controlled backup. Inspect BB's
 release notes first. Browser-only activity may not keep a Codespace awake;
 shutdown/idle behavior is controlled by Codespaces policy.
 
+## Machine mode
+
+`mode: "machine"` makes the container a BB **machine** of a hosted BB server,
+for example a learner's own Tutor server. The server, its plugins and the
+browser UI run elsewhere; the learner's workspace, coding agents and BB's
+host entry run here. Nothing listens on a public or forwarded port: the
+daemon dials out to the server over https, and its `hostDaemonPort` stays on
+loopback.
+
+Per-learner values come from the environment, so one `devcontainer.json`
+serves a whole cohort. In Codespaces, set them as Codespaces secrets for the
+repository:
+
+| Variable | What |
+| --- | --- |
+| `BB_MACHINE_SERVER_URL` | The server's https origin, e.g. `https://student-001-tutor.leansoftware.ai` (or set the `serverUrl` option instead). |
+| `BB_MACHINE_ACCESS_CLIENT_ID`, `BB_MACHINE_ACCESS_CLIENT_SECRET` | Optional: a Cloudflare Access service token, when Access fronts the server. A Service Auth policy on the server's Access application must allow it. |
+
+```jsonc
+"features": {
+    "ghcr.io/lean-software-production/devcontainer-features/bb:1": {
+        "version": "0.45.0",      // the server's bb-app version: a daemon speaks its server's protocol
+        "mode": "machine",
+        "autoStart": true
+    }
+}
+```
+
+`postCreateCommand` prepares `~/.bb-machine` (mode 0700; `dataDir` overrides
+it). On every container start, `postStartCommand`:
+
+1. Without `BB_MACHINE_SERVER_URL`, prints what to set and exits 0, so the
+   container still starts.
+2. Writes the token, if any, to two 0600 files in the 0700 runtime directory:
+   the daemon's `BB_SERVER_HEADERS` (`CF-Access-Client-Id` and
+   `CF-Access-Client-Secret`), and a curl config. The token never reaches an
+   argv, a log or stdout.
+3. On first start only, asks the server for an enroll key
+   (`POST /internal/hosts/enroll-key`) with those headers. bb-app 0.45.0's own
+   `host-daemon join` makes this request without `BB_SERVER_HEADERS`, so
+   behind Access it gets the login page. The server hands enroll keys to
+   loopback callers only. A server behind cloudflared on its own box sees
+   cloudflared's loopback connection.
+4. Starts `bb-app host-daemon --server-url <url> --supervise` in a new session,
+   as standalone mode does, so Codespaces' lifecycle cleanup does not stop
+   it. `--supervise` restarts it after a crash. It waits up to 60 seconds for
+   the daemon to report `Connected to server`, then drops the spent enroll key
+   from its environment file.
+
+`bb-feature-status` says whether the daemon runs and its newest session is
+connected. A stopped Codespace drops off the server; on resume the start
+hook brings the daemon back, and BB's daemon reconnects on its own after
+network drops.
+
+BB finds the learner's coding agents (Claude Code, Codex, pi) from the login
+shell's PATH, so install them with their Features in the same container and
+sign in to them once inside it.
+
+The `machine` CI scenario covers what needs no server: install, no-secret
+start, refusal of http URLs and half a token, and that the token files are
+0600. A connected machine was checked by hand on 2026-10-04 against a hosted
+bb-app 0.45.0 server behind Cloudflare Access, with `devcontainer up
+--secrets-file` standing in for Codespaces secrets. It connected in about 3
+seconds, survived a container restart, and kept the token out of every argv
+and log.
+
 ## Validation boundary
 
 The repository CI scenarios exercise installation, CLI/no-start behavior,

@@ -70,6 +70,17 @@ consumer template. Keep the forwarded server port owner-private in GitHub's
 Ports UI and do not forward the host-daemon port. See the [BB notes](src/bb/NOTES.md)
 for security, persistence, provider-login, and live acceptance boundaries.
 
+### Machine mode
+
+`mode: "machine"` makes the container a BB **machine** of a hosted BB server
+instead — for example a learner's own hosted Tutor server — rather than
+running the server itself. Nothing listens on a public or forwarded port: the
+host daemon dials out to the server over https. Per-learner server details
+come from the environment (a Codespaces secret), so one `devcontainer.json`
+serves a whole cohort. See the [copyable example](examples/bb-machine) and
+[src/bb/NOTES.md](src/bb/NOTES.md#machine-mode) for setup and the Access
+service-token option.
+
 ## Tutor course Codespaces (deprecated)
 
 **Deprecated (2026-10):** Tutor is now hosted, one server per student, and

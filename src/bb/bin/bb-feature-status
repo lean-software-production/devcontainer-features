@@ -2,6 +2,7 @@
 set -euo pipefail
 . /usr/local/share/bb/bin/bb-feature-common.sh
 bb_feature_validate_options
+[ "$BB_FEATURE_MODE" != machine ] || exec /usr/local/share/bb/bin/bb-feature-machine status
 if [ "$BB_FEATURE_MODE" != standalone ]; then echo "BB Feature is in cli mode; no standalone runtime is configured."; exit 0; fi
 bb_feature_prepare_data_dir
 

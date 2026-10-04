@@ -3,6 +3,7 @@ set -euo pipefail
 . /usr/local/share/bb/bin/bb-feature-common.sh
 
 bb_feature_validate_options
+[ "$BB_FEATURE_MODE" != machine ] || exec /usr/local/share/bb/bin/bb-feature-machine autostart
 [ "$BB_FEATURE_MODE" = standalone ] && [ "$BB_FEATURE_AUTOSTART" = true ] || exit 0
 bb_feature_prepare_data_dir
 

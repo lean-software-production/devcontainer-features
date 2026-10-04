@@ -81,7 +81,11 @@ serves a whole cohort. See the [copyable example](examples/bb-machine) and
 [src/bb/NOTES.md](src/bb/NOTES.md#machine-mode) for setup and the Access
 service-token option.
 
-## Tutor course Codespaces
+## Tutor course Codespaces (deprecated)
+
+**Deprecated (2026-10):** Tutor is now hosted, one server per student, and
+the student's Codespace joins it with the `bb` feature's `machine` mode.
+This feature gets no new versions.
 
 [`tutor`](src/tutor) adds the Tutor BB plugin to a standalone `bb` Feature: a
 course outline, lesson cards, and a coach that works one Gherkin Rule at a time.

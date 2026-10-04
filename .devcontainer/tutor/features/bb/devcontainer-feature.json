@@ -1,8 +1,8 @@
 {
   "id": "bb",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "BB standalone Codespaces",
-  "description": "Installs the BB CLI and, when selected, a private loopback-only standalone BB server for one Codespace user.",
+  "description": "Installs the BB CLI and, when selected, a private loopback-only standalone BB server for one Codespace user, or a BB machine that joins a hosted BB server.",
   "documentationURL": "https://github.com/lean-software-production/devcontainer-features/tree/main/src/bb",
   "installsAfter": [
     "ghcr.io/devcontainers/features/node"
@@ -16,14 +16,14 @@
     },
     "mode": {
       "type": "string",
-      "enum": ["cli", "standalone"],
+      "enum": ["cli", "standalone", "machine"],
       "default": "cli",
-      "description": "'cli' installs BB only; 'standalone' enables the user-owned local BB server lifecycle helpers."
+      "description": "'cli' installs BB only; 'standalone' enables the user-owned local BB server lifecycle helpers; 'machine' makes this container a BB machine of a hosted BB server (serverUrl)."
     },
     "autoStart": {
       "type": "boolean",
       "default": false,
-      "description": "In standalone mode, start the local BB server after each container start."
+      "description": "In standalone mode, start the local BB server after each container start; in machine mode, enrol (once) and start the host daemon after each container start."
     },
     "serverPort": {
       "type": "string",
@@ -38,12 +38,17 @@
     "dataDir": {
       "type": "string",
       "default": "",
-      "description": "Absolute, user-owned BB state directory. Empty uses the remote user's ~/.bb."
+      "description": "Absolute, user-owned BB state directory. Empty uses the remote user's ~/.bb (standalone) or ~/.bb-machine (machine)."
     },
     "appUrl": {
       "type": "string",
       "default": "auto",
       "description": "Browser origin for BB. 'auto' derives the private Codespaces forwarded URL, or a loopback URL outside Codespaces."
+    },
+    "serverUrl": {
+      "type": "string",
+      "default": "",
+      "description": "Machine mode: the hosted BB server's https origin. Empty reads BB_MACHINE_SERVER_URL from the environment (for example a Codespaces secret), so one devcontainer.json serves every learner."
     }
   },
   "postCreateCommand": "/usr/local/share/bb/bin/bb-feature-bootstrap",

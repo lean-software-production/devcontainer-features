@@ -16,12 +16,13 @@ Installs the BB CLI and, when selected, a private loopback-only standalone BB se
 | Options Id | Description | Type | Default Value |
 |-----|-----|-----|-----|
 | version | bb-app version to install. Use an exact version for reproducible builds; 'latest' is explicitly allowed but resolved only while building the image. | string | 0.43.4 |
-| mode | 'cli' installs BB only; 'standalone' enables the user-owned local BB server lifecycle helpers. | string | cli |
-| autoStart | In standalone mode, start the local BB server after each container start. | boolean | false |
+| mode | 'cli' installs BB only; 'standalone' enables the user-owned local BB server lifecycle helpers; 'machine' makes this container a BB machine of a hosted BB server (serverUrl). | string | cli |
+| autoStart | In standalone mode, start the local BB server after each container start; in machine mode, enrol (once) and start the host daemon after each container start. | boolean | false |
 | serverPort | Loopback-only BB web server port (1024-65535). | string | 38886 |
 | hostDaemonPort | Loopback-only BB host-daemon helper port (1024-65535); do not forward this port. | string | 38887 |
-| dataDir | Absolute, user-owned BB state directory. Empty uses the remote user's ~/.bb. | string | - |
+| dataDir | Absolute, user-owned BB state directory. Empty uses the remote user's ~/.bb (standalone) or ~/.bb-machine (machine). | string | - |
 | appUrl | Browser origin for BB. 'auto' derives the private Codespaces forwarded URL, or a loopback URL outside Codespaces. | string | auto |
+| serverUrl | Machine mode: the hosted BB server's https origin. Empty reads BB_MACHINE_SERVER_URL from the environment (for example a Codespaces secret), so one devcontainer.json serves every learner. | string | - |
 
 ## What this Feature runs
 

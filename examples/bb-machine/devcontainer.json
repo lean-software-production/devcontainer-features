@@ -1,0 +1,14 @@
+{
+  "name": "A BB machine of a hosted BB server",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:5-24-trixie",
+  "remoteUser": "node",
+  "features": {
+    "ghcr.io/lean-software-production/devcontainer-features/bb:1": {
+      "version": "0.45.0",
+      "mode": "machine",
+      "autoStart": true
+    }
+  }
+  // Set Codespaces secrets BB_MACHINE_SERVER_URL, BB_MACHINE_ACCESS_CLIENT_ID and
+  // BB_MACHINE_ACCESS_CLIENT_SECRET for the repository; see src/bb/NOTES.md, "Machine mode".
+}

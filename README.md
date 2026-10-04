@@ -70,7 +70,11 @@ consumer template. Keep the forwarded server port owner-private in GitHub's
 Ports UI and do not forward the host-daemon port. See the [BB notes](src/bb/NOTES.md)
 for security, persistence, provider-login, and live acceptance boundaries.
 
-## Tutor course Codespaces
+## Tutor course Codespaces (deprecated)
+
+**Deprecated (2026-10):** Tutor is now hosted, one server per student, and
+the student's Codespace joins it with the `bb` feature's `machine` mode
+(bb 1.1.0). This feature gets no new versions.
 
 [`tutor`](src/tutor) adds the Tutor BB plugin to a standalone `bb` Feature: a
 course outline, lesson cards, and a coach that works one Gherkin Rule at a time.

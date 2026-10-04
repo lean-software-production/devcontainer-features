@@ -1,6 +1,6 @@
 > **Deprecated (2026-10):** Tutor is now hosted, one server per student, and
-> the student's Codespace joins it with the `bb` feature's `machine` mode
-> (bb 1.1.0). This feature gets no new versions.
+> the student's Codespace joins it with the `bb` feature's `machine` mode.
+> This feature gets no new versions.
 
 ## What this Feature adds
 

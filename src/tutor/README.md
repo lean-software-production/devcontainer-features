@@ -1,10 +1,6 @@
 
 # Tutor coached course for BB (tutor)
 
-> **Deprecated (2026-10):** Tutor is now hosted, one server per student, and
-> the student's Codespace joins it with the `bb` feature's `machine` mode.
-> This feature gets no new versions.
-
 Adds the Tutor BB plugin (a checksummed bb-plugin-tutor release: the pinned one by default, or the newest with pluginVersion 'latest') to the bb Feature's standalone server: a course outline in the sidebar and a coach thread per lesson that works one Gherkin Rule at a time. Requires the bb Feature in standalone mode.
 
 ## Example Usage
@@ -31,6 +27,10 @@ Adds the Tutor BB plugin (a checksummed bb-plugin-tutor release: the pinned one 
 | appIcons | Icons BB's web app shows in browser tabs, bookmarks and home screens: 'lsp' replaces every BB icon with the LSP one, 'bb' keeps BB's. | string | lsp |
 | pluginVersion | bb-plugin-tutor release downloaded from GitHub at image build: a plain semantic version (no 'v' prefix or range), or 'latest'. The default is the release this Feature pins, verified against its pinned SHA-256; any other version needs pluginSha256. 'latest' resolves to the newest release when the image is built (a prebuilt image keeps it until rebuilt) and is checked only against that release's own .sha256, which catches corruption but not a compromised release. | string | 0.3.0 |
 | pluginSha256 | SHA-256 (64 lower-case hex digits) of bb-plugin-tutor-<pluginVersion>.tgz. Required when pluginVersion is an explicit version other than the pinned default; with the default it must be empty or equal the pin; with 'latest' it must be empty. For an explicit version the release's own .sha256 file is never trusted. | string | - |
+
+> **Deprecated (2026-10):** Tutor is now hosted, one server per student, and
+> the student's Codespace joins it with the `bb` feature's `machine` mode.
+> This feature gets no new versions.
 
 ## What this Feature adds
 
